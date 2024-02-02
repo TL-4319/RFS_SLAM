@@ -5,15 +5,15 @@ clc;
 
 %% Load truth and measurement data
 addpath ('../util/')
-load('../dataset/truth_2.mat');
-load('../dataset/meas_table_2.mat');
+load('../dataset/truth_1.mat');
+%load('../dataset/meas_table_2.mat');
 truth_hist = truth.pos(:,1);
 
 %% 
 rng(42069);
 time_vec = truth.time_vec;
 dt = time_vec(2) - time_vec(1);
-draw = false;
+draw = true;
 
 %% Drawing stuffs
 if draw
@@ -28,40 +28,43 @@ end
 
 
 %% Prealocate estimated traj
-est_traj = truth;
-est_traj.hist = truth.pos(:,1);
+est = truth;
+est.map_est = cell(size(time_vec,2),1);
 
 %% SLAM configuration
 % Trajectory config
-num_particle = 1000;
+filter_params.num_particle = 1000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
-motion_sigma = [5; 5; 0; 0; 0; 2];
+filter_params.motion_sigma = [5; 5; 0; 0; 0; 2];
 
 % Map PHD config
-birthGM_intensity = 0.1;
-birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.0001];
+filter_params.birthGM_intensity = 0.1;
+filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.0001];
 
 % Sensor model
-map_Q = diag([0.2, 0.2, 0.001]);
-filter_sensor_noise = 0.2;
-R = diag([filter_sensor_noise^2, filter_sensor_noise^2, 0.00001]);
+filter_params.map_Q = diag([0.2, 0.2, 0.001]);
+filter_params.filter_sensor_noise = 0.2;
+filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
+    filter_params.filter_sensor_noise^2, 0.00001]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
-clutter_intensity = 50 / (20^2 * 0.3 * pi);
-P_d = 0.7;
+filter_params.clutter_intensity = 50 / (20^2 * 0.3 * pi);
+filter_params.P_d = 0.7;
 
 % PHD management parameters
-pruning_thres = 10^-5;
-merge_dist = 4;
-num_GM_cap = 100;
+filter_params.pruning_thres = 10^-5;
+filter_params.merge_dist = 1;
+filter_params.num_GM_cap = 100;
 
-landmark_threshold = 0.01;
+est.filter_params = filter_params;
+
 %% Initialize SLAM particles
-cur_pos = est_traj.pos(:,1);
-cur_quat = est_traj.quat(1,:);
-meas = meas_table{1,1};
+cur_pos = est.pos(:,1);
+cur_quat = est.quat(1,:);
+meas = truth.meas_table{1,1};
 meas_world_frame = reproject_meas(cur_pos, cur_quat, meas);
-particles = init_phd_particles (num_particle, cur_pos, cur_quat, meas_world_frame, birthGM_cov, birthGM_intensity);
+particles = init_phd_particles (filter_params.num_particle, cur_pos, cur_quat, ...
+    meas_world_frame, filter_params.birthGM_cov, filter_params.birthGM_intensity);
 
 %% Run simulation
 for i=2:size(time_vec,2)
@@ -71,8 +74,7 @@ for i=2:size(time_vec,2)
     % imshow(map_png_name);
 
     %% Parse some truth data
-    truth_hist = horzcat (truth_hist, truth.pos(:,i));
-    meas = meas_table{i,1};
+    meas = truth.meas_table{i,1};
 
     meas_reprojected = reproject_meas(truth.pos(:,i), truth.quat(i,:), meas);
 
@@ -82,12 +84,12 @@ for i=2:size(time_vec,2)
     end
 
     %% SLAM runs here
-    Parlikeli = zeros (1,num_particle);
+    Parlikeli = zeros (1,filter_params.num_particle);
     for par_ind = 1:size(particles,2)
         cur_particle = particles(1,par_ind);
         %% Trajectory prediction
-        body_vel_sample = randn(3,1) .* motion_sigma(1:3);
-        body_rot_vel_sample = randn(3,1) .* motion_sigma(4:6);
+        body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
+        body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
         
         % Constraint vel to 2D
         body_vel_sample(3,:) = 0;
@@ -116,8 +118,8 @@ for i=2:size(time_vec,2)
         num_GM = size(cur_particle.gm_mu,2);
         isinFOV = zeros (1, num_GM);
         for kk = 1:num_GM
-            isinFOV(kk) = check_in_FOV (cur_particle.gm_mu(:,kk), ...
-                cur_particle.pos, cur_particle.quat, truth.sensor);
+            isinFOV(kk) = check_in_FOV_2D (cur_particle.gm_mu(:,kk), ...
+                cur_particle.pos, cur_particle.quat, truth.sensor_params);
         end
 
         %% Extract GM components not in FOV. No changes are made to them
@@ -160,7 +162,7 @@ for i=2:size(time_vec,2)
             % constant. 
         
             for kk = 1:num_GM_in
-                GM_cov_in(:,:,kk) = GM_cov_in_prev(:,:,kk) + map_Q;
+                GM_cov_in(:,:,kk) = GM_cov_in_prev(:,:,kk) + filter_params.map_Q;
             end
 
 
@@ -172,19 +174,22 @@ for i=2:size(time_vec,2)
                     pred_z = gen_pred_meas(cur_particle.pos, cur_particle.quat, GM_mu_in_prev(:,kk));
                     zdiff = meas(:, jj) - pred_z;
                     %%%%%
-                    likelipf (1,kk) = 1/sqrt(det(2*pi*R))*exp(-0.5*(zdiff)'*inv(R)*zdiff ) * GM_inten_in_prev(kk);
+                    likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
+                        exp(-0.5*(zdiff)'*inv(filter_params.R)*zdiff ) * ...
+                        GM_inten_in_prev(kk);
                     %likelipf (1, kk) = mvnpdf(meas(:, jj), pred_z, R) * clutter_intensity;
                 end
-                likelipz(1,jj) = clutter_intensity + sum (likelipf,2);
+                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf,2);
             end
             Parlikeli(1,par_ind) = prod(likelipz,2) + 1e-99;
 
 
             % Pre compute inner update terms
-            [pred_z, K, S, P] = compute_update_terms (cur_particle, GM_mu_in_prev, GM_cov_in_prev, R);
+            [pred_z, K, S, P] = compute_update_terms (cur_particle,...
+                GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
 
             % Update missed detection terms
-            GM_inten_in = (1 - P_d) * GM_inten_in_prev;
+            GM_inten_in = (1 - filter_params.P_d) * GM_inten_in_prev;
 
             %Update PHD component of detected 
             l = 0;
@@ -192,20 +197,24 @@ for i=2:size(time_vec,2)
                 l = l + 1;
                 tau = zeros(1,num_GM_in);
                 for jj = 1:num_GM_in
-                    tau(1,jj) = P_d * GM_inten_in_prev(jj) * mvnpdf(meas(:,zz),pred_z(:,jj),S(:,:,jj));
+                    tau(1,jj) = filter_params.P_d * ...
+                        GM_inten_in_prev(jj) * ...
+                        mvnpdf(meas(:,zz),pred_z(:,jj),S(:,:,jj));
                     mu = GM_mu_in_prev(:,jj) + K(:,:,jj)* (meas(:,zz) - pred_z(:,jj));
                     GM_mu_in = horzcat(GM_mu_in, mu);
                     GM_cov_in = cat(3,GM_cov_in, P(:,:,jj));
                 end
                     tau_sum = sum(tau);
                 for jj = 1:num_GM_in
-                    nu = tau(jj) / (clutter_intensity + tau_sum);
+                    nu = tau(jj) / (filter_params.clutter_intensity + tau_sum);
                     GM_inten_in = horzcat(GM_inten_in, nu);
                 end
             end
             %% Clean up GM components
             % Prune
-            [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in, GM_cov_in, GM_inten_in, pruning_thres, merge_dist, num_GM_cap);
+            [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
+                GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
+                filter_params.merge_dist, filter_params.num_GM_cap);
     
             %% Add back components not in FOV
             particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
@@ -222,9 +231,8 @@ for i=2:size(time_vec,2)
     [max_likeli, max_w_particle_ind] = max(Parlikeli);
 
     % MAP trajectory estimation
-    est_traj.pos = particles(1,max_w_particle_ind).pos;
-    est_traj.quat = particles(1,max_w_particle_ind).quat;
-    est_traj.hist = horzcat(est_traj.hist, est_traj.pos);
+    est.pos(:,i) = particles(1,max_w_particle_ind).pos;
+    est.quat(i,:) = particles(1,max_w_particle_ind).quat;
     
     % MAP Landmark estimation
     max_likeli_gm_mu = particles(1,max_w_particle_ind).gm_mu;
@@ -235,16 +243,17 @@ for i=2:size(time_vec,2)
     %ID_map = find(max_likeli_gm_inten > landmark_threshold);
     [~,ID_map] = maxk (max_likeli_gm_inten, exp_num_landmark);
     map_est = max_likeli_gm_mu(:,ID_map);
+    est.map_est {i,1} = map_est;
 
     %% Adaptive birth PHD (from Lin Gao paper)
     new_birth_mu = []; new_birth_inten = []; new_birth_cov = [];
-    new_meas_world_frame = reproject_meas(est_traj.pos, est_traj.quat, meas);
+    new_meas_world_frame = reproject_meas(est.pos(:,i), est.quat(i,:), meas);
     for zz = 1:size(meas,2)
         cur_GM_mu = particles(1,max_w_particle_ind).gm_mu;
         matrix_dist = repmat(new_meas_world_frame(:,zz),1, size(cur_GM_mu,2)) - cur_GM_mu;
         dist = vecnorm(matrix_dist);
         if min(dist) >= 5 % If the measurement is not close to any existing landmark/target
-            new_birth_inten = horzcat (new_birth_inten,birthGM_intensity);
+            new_birth_inten = horzcat (new_birth_inten, birthGM_intensity);
             new_birth_mu = cat (2,new_birth_mu, new_meas_world_frame(:,zz));
             new_birth_cov = cat (3, new_birth_cov, birthGM_cov);
         end
@@ -257,8 +266,8 @@ for i=2:size(time_vec,2)
 
     %% Resample particles (from Lin Gao)
     wei_ud = Parlikeli / sum(Parlikeli,2);
-    resample_ind = particle_resample(wei_ud, num_particle);
-    for par_ind = 1:num_particle
+    resample_ind = particle_resample(wei_ud, filter_params.num_particle);
+    for par_ind = 1:filter_params.num_particle
         particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
         particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
         particles(1,par_ind).w = particles(1,resample_ind(1,par_ind)).w;
@@ -271,8 +280,8 @@ for i=2:size(time_vec,2)
      if draw
         % Plotting
         figure(1)
-        draw_trajectory(truth.pos(:,i), truth.quat(i,:), truth_hist, 1, 10, 2,'k',false);
-        draw_trajectory(est_traj.pos, est_traj.quat, est_traj.hist, 1, 10, 2,'g',true);
+        draw_trajectory(truth.pos(:,i), truth.quat(i,:), truth.pos(:,1:i), 1, 10, 2,'k',false);
+        draw_trajectory(est.pos(:,i), est.quat(i,:), est.pos(:,1:i), 1, 10, 2,'g',true);
         hold on
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
@@ -307,16 +316,3 @@ for i=2:size(time_vec,2)
         drawnow;
     end
 end
-
-pos_dif = est_traj.hist - truth_hist;
-pos_dif_sq = pos_dif.^2;
-dist_error = pos_dif_sq(1,:) + pos_dif_sq(2,:);
-dist_error = dist_error.^0.5;
-
-figure(3)
-plot (time_vec, dist_error);
-name = sprintf("%d Particles", num_particle);
-title(name)
-grid on;
-xlabel ("time(s)");
-ylabel ("Dist error (m)");

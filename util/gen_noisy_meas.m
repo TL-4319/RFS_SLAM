@@ -1,8 +1,8 @@
-function measurements = gen_meas (pos, quat, landmark, sensor)
+function [measurements, landmark_in_fov] = gen_noisy_meas (pos, quat, landmark, sensor)
     % Range check
     pos_diff = landmark - pos;
-    dist = vecnorm(pos_diff,2,1);
-    inrange_ind = find (dist < sensor.Range);
+    dist = vecnorm(pos_diff,2,1); 
+    inrange_ind = find (all([dist < sensor.max_range; dist > sensor.min_range]));
     landmark_inrange = landmark(:, inrange_ind);
     pos_diff_inrange = pos_diff(:,inrange_ind);
     
@@ -14,7 +14,7 @@ function measurements = gen_meas (pos, quat, landmark, sensor)
     landmark_bearing_from_sensor = atan2(pos_diff_inrange_body_frame(2,:),pos_diff_inrange_body_frame(1,:));
     in_FOV_ind = find(abs(landmark_bearing_from_sensor) < sensor.HFOV/2);
     body_meas_in_FOV = pos_diff_inrange_body_frame (:,in_FOV_ind);
-
+    landmark_in_fov = landmark_inrange(:,in_FOV_ind);
     % Detection probability
     detected_prob = rand(1,size(body_meas_in_FOV,2));
     detected_ind = find (detected_prob < sensor.P_d);
@@ -27,7 +27,7 @@ function measurements = gen_meas (pos, quat, landmark, sensor)
 
     % Add clutter
     num_clutter = poissrnd (sensor.clutter_rate);
-    clutter_range = rand(1,num_clutter) * sensor.Range;
+    clutter_range = rand(1,num_clutter) .* (sensor.max_range - sensor.min_range) + sensor.min_range;
     clutter_bearing = (rand(1,num_clutter) - 0.5) * sensor.HFOV/2;
     clutter_meas = zeros(3,num_clutter);
     clutter_meas(1,:) = cos(clutter_bearing) .* clutter_range;
