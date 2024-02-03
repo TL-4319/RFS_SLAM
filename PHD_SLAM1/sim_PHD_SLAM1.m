@@ -19,7 +19,7 @@ draw = true;
 if draw
     fig1 = figure(1);
     title ("Sim world")
-    fig1.Position = [1,1,600,600];
+    fig1.Position = [1,1,1000,1000];
     
     fig2 = figure(2);
     title("Sensor frame")
@@ -253,9 +253,9 @@ for i=2:size(time_vec,2)
         matrix_dist = repmat(new_meas_world_frame(:,zz),1, size(cur_GM_mu,2)) - cur_GM_mu;
         dist = vecnorm(matrix_dist);
         if min(dist) >= 5 % If the measurement is not close to any existing landmark/target
-            new_birth_inten = horzcat (new_birth_inten, birthGM_intensity);
+            new_birth_inten = horzcat (new_birth_inten, filter_params.birthGM_intensity);
             new_birth_mu = cat (2,new_birth_mu, new_meas_world_frame(:,zz));
-            new_birth_cov = cat (3, new_birth_cov, birthGM_cov);
+            new_birth_cov = cat (3, new_birth_cov, filter_params.birthGM_cov);
         end
     end
     for par_ind = 1:size(particles,2)
@@ -306,7 +306,7 @@ for i=2:size(time_vec,2)
         axis square
         title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
         title(title_str)
-        exportgraphics(fig1, "map5.gif", Append=true);
+        exportgraphics(fig1, "map.gif", Append=true);
 
         figure(2)
         draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
