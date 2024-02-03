@@ -5,9 +5,14 @@ clc;
 
 %% Load truth and measurement data
 addpath ('../util/')
+
 load('../dataset/truth_1.mat');
 %load('../dataset/meas_table_2.mat');
 truth_hist = truth.pos(:,1);
+% truth.meas_table = meas_table;
+% truth.sensor_params = truth.sensor;
+% truth.sensor_params.max_range = truth.sensor_params.Range;
+% truth.sensor_params.min_range = 0;
 
 %% 
 rng(42069);
@@ -19,7 +24,7 @@ draw = true;
 if draw
     fig1 = figure(1);
     title ("Sim world")
-    fig1.Position = [1,1,1000,1000];
+    fig1.Position = [1,1,800,800];
     
     fig2 = figure(2);
     title("Sensor frame")
@@ -30,13 +35,14 @@ end
 %% Prealocate estimated traj
 est = truth;
 est.map_est = cell(size(time_vec,2),1);
+est.compute_time = zeros (1,size(time_vec,2));
 
 %% SLAM configuration
 % Trajectory config
 filter_params.num_particle = 1000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
-filter_params.motion_sigma = [5; 5; 0; 0; 0; 2];
+filter_params.motion_sigma = [1; 0; 0; 0; 0; 2];
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
@@ -53,8 +59,8 @@ filter_params.P_d = 0.7;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 1;
-filter_params.num_GM_cap = 100;
+filter_params.merge_dist = 4;
+filter_params.num_GM_cap = 1000;
 
 est.filter_params = filter_params;
 
@@ -84,15 +90,16 @@ for i=2:size(time_vec,2)
     end
 
     %% SLAM runs here
+    tic
     Parlikeli = zeros (1,filter_params.num_particle);
     for par_ind = 1:size(particles,2)
         cur_particle = particles(1,par_ind);
         %% Trajectory prediction
-        body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
+        body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3) + 1;
         body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
         
         % Constraint vel to 2D
-        body_vel_sample(3,:) = 0;
+        body_vel_sample(2:3,:) = 0;
         body_rot_vel(1:2,:) = zeros (2,1);
         
 
@@ -275,6 +282,7 @@ for i=2:size(time_vec,2)
         particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
         particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
     end
+    est.compute_time(1,i) = toc;
     %% Plotting
 
      if draw
