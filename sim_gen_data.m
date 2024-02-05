@@ -10,7 +10,7 @@ time_vec = 0:dt:160;
 draw = true;
 %% Generate landmark map
 map_size = 100;
-num_landmark = 2000;
+num_landmark = 800;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 landmark_locations(:,3) = zeros(1,size(landmark_locations,1));
 landmark_locations = landmark_locations';
@@ -18,7 +18,7 @@ landmark_locations = landmark_locations';
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(100);
-sensor.max_range = 15;
+sensor.max_range = 30;
 sensor.min_range = 0.4;
 sensor.P_d = 0.8;
 sensor.clutter_rate = 2;
@@ -30,7 +30,7 @@ quat = quaternion(1, 0, 0, 0);
 traj_hist = [];
 
 body_vel = [1;0;0];
-turn_command_delta = (rand(1, size(time_vec,2)) - 0.5);
+turn_command_delta = (rand(1, size(time_vec,2)) - 0.48);
 turn_command_scale = rand(1, size(time_vec,2)) * 0.005;
 body_rot_rate = zeros(3,size(time_vec,2));
 body_rot_rate(3,:) = cumsum(turn_command_delta.*turn_command_scale);
@@ -107,7 +107,7 @@ truth.meas_table{1,1} = meas;
         
         map_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/map/','001','.png');
         meas_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/meas/','001','.png');
-        saveas (fig1,map_name);
+        %saveas (fig1,map_name);
         %saveas (fig2, meas_name);
         drawnow
     end

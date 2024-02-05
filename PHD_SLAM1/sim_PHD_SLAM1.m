@@ -6,13 +6,13 @@ clc;
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_1.mat');
+load('../dataset/truth_4.mat');
 %load('../dataset/meas_table_2.mat');
 truth_hist = truth.pos(:,1);
-% truth.meas_table = meas_table;
-% truth.sensor_params = truth.sensor;
-% truth.sensor_params.max_range = truth.sensor_params.Range;
-% truth.sensor_params.min_range = 0;
+%truth.meas_table = meas_table;
+%truth.sensor_params = truth.sensor;
+%truth.sensor_params.max_range = truth.sensor_params.Range;
+%truth.sensor_params.min_range = 0;
 
 %% 
 rng(42069);
@@ -39,10 +39,10 @@ est.compute_time = zeros (1,size(time_vec,2));
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 1000;
+filter_params.num_particle = 2000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
-filter_params.motion_sigma = [1; 0; 0; 0; 0; 2];
+filter_params.motion_sigma = [0.5; 0; 0; 0; 0; 2.0];
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
@@ -50,16 +50,16 @@ filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.0001];
 
 % Sensor model
 filter_params.map_Q = diag([0.2, 0.2, 0.001]);
-filter_params.filter_sensor_noise = 0.2;
+filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, 0.00001]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
 filter_params.clutter_intensity = 50 / (20^2 * 0.3 * pi);
-filter_params.P_d = 0.7;
+filter_params.P_d = 0.8;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 4;
+filter_params.merge_dist = 1;
 filter_params.num_GM_cap = 1000;
 
 est.filter_params = filter_params;
