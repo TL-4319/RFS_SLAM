@@ -3,10 +3,14 @@ close all;
 clear;
 clc;
 
+%% 
+rng(42069);
+draw = true;
+
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_4.mat');
+load('../dataset/truth_7.mat');
 %load('../dataset/meas_table_2.mat');
 truth_hist = truth.pos(:,1);
 %truth.meas_table = meas_table;
@@ -14,11 +18,11 @@ truth_hist = truth.pos(:,1);
 %truth.sensor_params.max_range = truth.sensor_params.Range;
 %truth.sensor_params.min_range = 0;
 
-%% 
-rng(42069);
+%% Time vector
 time_vec = truth.time_vec;
 dt = time_vec(2) - time_vec(1);
-draw = true;
+
+
 
 %% Drawing stuffs
 if draw
@@ -39,10 +43,10 @@ est.compute_time = zeros (1,size(time_vec,2));
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 2000;
+filter_params.num_particle = 1000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
-filter_params.motion_sigma = [0.5; 0; 0; 0; 0; 2.0];
+filter_params.motion_sigma = [0.2; 0; 0; 0; 0; 0.1];
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
@@ -95,13 +99,16 @@ for i=2:size(time_vec,2)
     for par_ind = 1:size(particles,2)
         cur_particle = particles(1,par_ind);
         %% Trajectory prediction
-        body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3) + 1;
+        body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
         body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
         
         % Constraint vel to 2D
         body_vel_sample(2:3,:) = 0;
-        body_rot_vel(1:2,:) = zeros (2,1);
+        body_rot_vel_sample(1:2,:) = zeros (2,1);
         
+        % Particle odometry sample
+        body_vel_sample = truth.odometry_trans(:,i) + body_vel_sample; 
+        body_rot_vel = truth.odometry_rot(:,i) + body_rot_vel_sample;
 
         [cur_particle.pos, cur_particle.quat] = propagate_state (cur_particle.pos, ...
             cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);

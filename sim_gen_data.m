@@ -4,7 +4,7 @@ clear;
 clc;
 
 addpath("util/")
-rng(69421);
+rng(69431);
 dt = 0.2;
 time_vec = 0:dt:160;
 draw = true;
@@ -18,7 +18,7 @@ landmark_locations = landmark_locations';
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(100);
-sensor.max_range = 30;
+sensor.max_range = 50;
 sensor.min_range = 0.4;
 sensor.P_d = 0.8;
 sensor.clutter_rate = 2;
@@ -30,19 +30,26 @@ quat = quaternion(1, 0, 0, 0);
 traj_hist = [];
 
 body_vel = [1;0;0];
-turn_command_delta = (rand(1, size(time_vec,2)) - 0.48);
+turn_command_delta = (rand(1, size(time_vec,2)) - 0.47);
 turn_command_scale = rand(1, size(time_vec,2)) * 0.005;
 body_rot_rate = zeros(3,size(time_vec,2));
 body_rot_rate(3,:) = cumsum(turn_command_delta.*turn_command_scale);
 
 %% Prealocate truth data
 truth.pos = zeros(3,size(time_vec,2));
+truth.body_trans_vel = truth.pos;
+truth.body_rot_vel = truth.body_trans_vel;
 truth.pos(:,1) = pos;
 truth.quat = quaternion (zeros(size(time_vec,2),4));
 truth.quat(1,:) = quat;
 truth.time_vec = time_vec;
 truth.landmark_locations = landmark_locations;
 truth.landmark_in_FOV = cell(size(time_vec,2),1);
+truth.body_vel = truth.pos;
+truth.odometry_trans_sigma = 0.02;
+truth.odometry_rot_sigma = 0.01;
+truth.odometry_trans = truth.body_vel;
+truth.odometry_rot = truth.odometry_trans;
 
 truth.sensor_params = sensor;
 
@@ -118,6 +125,10 @@ for i=2:size(time_vec,2)
     traj_hist = horzcat (traj_hist,pos);
     [pos, quat] = propagate_state(pos, quat, body_vel, body_rot_rate(:,i), dt);
 
+    %% Add noise to odometry
+    trans_noise = randn(1) * truth.odometry_trans_sigma;
+    rot_noise = randn(1) * truth.odometry_rot_sigma;
+
     % Generate measurement sets
     [meas, landmark_inFOV] = gen_noisy_meas (pos, quat, landmark_locations, sensor);
     
@@ -127,8 +138,14 @@ for i=2:size(time_vec,2)
     
     truth.pos(:,i) = pos;
     truth.quat(i,:) = quat;
+    truth.body_trans_vel(:,i) = body_vel;
+    truth.body_rot_vel(:,i) = body_rot_rate(:,i);
     truth.landmark_in_FOV{i,1} = landmark_inFOV;
     truth.meas_table{i,1} = meas;
+    truth.odometry_trans(:,i) = body_vel + trans_noise;
+    truth.odometry_rot(:,i) = body_rot_rate(:,i) + rot_noise;
+    truth.odometry_trans(2:3,i) = [0;0];
+    truth.odometry_rot(1:2,i) = [0;0];
 
 
     if draw
