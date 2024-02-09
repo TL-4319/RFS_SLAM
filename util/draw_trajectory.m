@@ -14,10 +14,10 @@ function draw_trajectory (pos, quat, traj_hist,fig_num, scale, linewidth,traj_co
     else
         hold off
     end
-    plot3 (unit_x(1,:), unit_x(2,:),unit_x(3,:), 'r','LineWidth',linewidth)
+    plot3 (unit_x(1,:), unit_x(2,:),unit_x(3,:), 'r','LineWidth',linewidth, 'HandleVisibility','off')
     hold on
-    plot3 (unit_y(1,:), unit_y(2,:),unit_y(3,:), 'g','LineWidth',linewidth)
-    plot3 (unit_z(1,:), unit_z(2,:),unit_z(3,:), 'b', 'LineWidth',linewidth)
-    plot3 (traj_hist(1,:), traj_hist (2,:), traj_hist(3,:), traj_color)
+    plot3 (unit_y(1,:), unit_y(2,:),unit_y(3,:), 'g','LineWidth',linewidth,'HandleVisibility','off')
+    plot3 (unit_z(1,:), unit_z(2,:),unit_z(3,:), 'b', 'LineWidth',linewidth,'HandleVisibility','off')
+    plot3 (traj_hist(1,:), traj_hist (2,:), traj_hist(3,:), traj_color,'HandleVisibility','off')
     hold off
 end
