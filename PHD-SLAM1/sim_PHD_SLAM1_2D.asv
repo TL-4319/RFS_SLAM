@@ -10,19 +10,11 @@ draw = true;
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_7.mat');
-%load('../dataset/meas_table_2.mat');
-truth_hist = truth.pos(:,1);
-%truth.meas_table = meas_table;
-%truth.sensor_params = truth.sensor;
-%truth.sensor_params.max_range = truth.sensor_params.Range;
-%truth.sensor_params.min_range = 0;
+load('../dataset/truth_2D_1.mat');
 
 %% Time vector
 time_vec = truth.time_vec;
 dt = time_vec(2) - time_vec(1);
-
-
 
 %% Drawing stuffs
 if draw
@@ -41,14 +33,27 @@ est = truth;
 est.map_est = cell(size(time_vec,2),1);
 est.compute_time = zeros (1,size(time_vec,2));
 
+%% Odometry configuration
+%% Odometry parameters
+odom.sigma_trans = [0.3; 0.3; 0.3];
+odom.sigma_rot = [0.01; 0.01; 0.01];
+odom.body_trans_vel = truth.body_trans_vel + ...
+    randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
+odom.body_rot_vel = truth.body_rot_vel + ...
+    randn(3,size(truth.body_rot_vel,2)) .* repmat(odom.sigma_rot,1,size(truth.body_rot_vel,2));
+
+% Constraint odom to 2D
+odom.body_trans_vel(3,:) = zeros(1,size(odom.body_trans_vel,2));
+odom.body_rot_vel(1:2,:) = zeros(2,size(odom.body_trans_vel,2));
+
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 1000;
+filter_params.num_particle = 100;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
-filter_params.motion_sigma = [0.2; 0; 0; 0; 0; 0.1];
+filter_params.motion_sigma = [0.2; 0.2; 0; 0; 0; 0.1];
 
-% Map PHD config
+% Map PHD config. Dedault value for birth value
 filter_params.birthGM_intensity = 0.1;
 filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.0001];
 
@@ -79,14 +84,11 @@ particles = init_phd_particles (filter_params.num_particle, cur_pos, cur_quat, .
 %% Run simulation
 for i=2:size(time_vec,2)
     disp (time_vec(i));
-    % map_png_name = sprintf ("/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/map/%s.png",pad(sprintf('%d',i), 3, 'left','0'));
-    % figure(1)
-    % imshow(map_png_name);
 
     %% Parse some truth data
     meas = truth.meas_table{i,1};
 
-    meas_reprojected = reproject_meas(truth.pos(:,i), truth.quat(i,:), meas);
+    meas_reprojected = reproject_meas(truth.pos(:,i), truth.quat(i,:), meas); % This is for visualizing measurements in global space
 
     pause_ind = -1;
     if i == pause_ind + 1
@@ -95,28 +97,32 @@ for i=2:size(time_vec,2)
 
     %% SLAM runs here
     tic
-    Parlikeli = zeros (1,filter_params.num_particle);
+    Parlikeli = zeros (1,filter_params.num_particle);   %Pre allocate particle likelihood vector
     for par_ind = 1:size(particles,2)
         cur_particle = particles(1,par_ind);
         %% Trajectory prediction
+        % Sample random noise to add in odometry measurements
         body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
         body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
         
-        % Constraint vel to 2D
+        % Constraint velocity noise to 2D
         body_vel_sample(2:3,:) = 0;
         body_rot_vel_sample(1:2,:) = zeros (2,1);
         
-        % Particle odometry sample
-        body_vel_sample = truth.odometry_trans(:,i) + body_vel_sample; 
-        body_rot_vel = truth.odometry_rot(:,i) + body_rot_vel_sample;
-
+        % Particle odometry sample. Add noisy odometry measurement with
+        % random noise
+        body_vel_sample = odom.body_trans_vel(:,i) + body_vel_sample; 
+        body_rot_vel = odom.body_rot_vel(:,i) + body_rot_vel_sample;
+        
+        % Predict the particle state given the sampled odometry
         [cur_particle.pos, cur_particle.quat] = propagate_state (cur_particle.pos, ...
             cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);
 
         % Give particle truth pose for map debug
         %cur_particle.pos = truth.pos(:,i);
         %cur_particle.quat = truth.quat(i,:);
-
+        
+        % Assign pose back to particle structure
         particles(1,par_ind).pos = cur_particle.pos;
         particles(1,par_ind).quat = cur_particle.quat;
     
@@ -130,14 +136,11 @@ for i=2:size(time_vec,2)
 
         %% Check if GM is in FOV
         num_GM = size(cur_particle.gm_mu,2);
-        isinFOV = zeros (1, num_GM);
-        for kk = 1:num_GM
-            isinFOV(kk) = check_in_FOV_2D (cur_particle.gm_mu(:,kk), ...
+        [~, GM_in_FOV] = check_in_FOV_2D (cur_particle.gm_mu, ...
                 cur_particle.pos, cur_particle.quat, truth.sensor_params);
-        end
 
         %% Extract GM components not in FOV. No changes are made to them
-        GM_out_FOV = find (~isinFOV);
+        GM_out_FOV = ~GM_in_FOV;
         GM_mu_out = cur_particle.gm_mu(:,GM_out_FOV);
         GM_cov_out = cur_particle.gm_cov (:,:,GM_out_FOV);
         GM_inten_out = cur_particle.gm_inten(GM_out_FOV);

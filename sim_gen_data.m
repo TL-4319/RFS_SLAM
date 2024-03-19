@@ -9,8 +9,8 @@ dt = 0.2;
 time_vec = 0:dt:160;
 draw = true;
 %% Generate landmark map
-map_size = 100;
-num_landmark = 800;
+map_size = 150;
+num_landmark = 3000;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 landmark_locations(:,3) = zeros(1,size(landmark_locations,1));
 landmark_locations = landmark_locations';
@@ -18,38 +18,41 @@ landmark_locations = landmark_locations';
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(100);
-sensor.max_range = 50;
+sensor.max_range = 20;
 sensor.min_range = 0.4;
-sensor.P_d = 0.8;
+sensor.P_d = 0.9;
 sensor.clutter_rate = 2;
 sensor.sigma = 0.1;
 
-% Initial pose
-pos = [0;0;0];
-quat = quaternion(1, 0, 0, 0);
-traj_hist = [];
+% Generate trajectory
+waypoints = [0,0,0; ... % Initial position
+             20, 10, 0;...
+             20, 60, 0; ...
+             40, 80, 0
+             120,120,0];    % Final position
 
-body_vel = [1;0;0];
-turn_command_delta = (rand(1, size(time_vec,2)) - 0.47);
-turn_command_scale = rand(1, size(time_vec,2)) * 0.005;
-body_rot_rate = zeros(3,size(time_vec,2));
-body_rot_rate(3,:) = cumsum(turn_command_delta.*turn_command_scale);
+orientation_wp = quaternion([0,0,0; ...
+                          30,0,0;...
+                          90,0,0;...
+                          70,0,0;...
+                          50,0,0],...
+                          "eulerd","ZYX","frame");
+
+groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero velocity
+
+
+[pos, quat, trans_vel, acc_body, rot_vel, time_vec] = generate_trajectory(waypoints,...
+    orientation_wp, groundspeed, dt);
 
 %% Prealocate truth data
-truth.pos = zeros(3,size(time_vec,2));
-truth.body_trans_vel = truth.pos;
-truth.body_rot_vel = truth.body_trans_vel;
-truth.pos(:,1) = pos;
-truth.quat = quaternion (zeros(size(time_vec,2),4));
-truth.quat(1,:) = quat;
+truth.pos = pos;
+truth.body_trans_vel = trans_vel;
+truth.body_rot_vel = rot_vel;
+truth.body_trans_accel = acc_body;
+truth.quat = quat;
 truth.time_vec = time_vec;
 truth.landmark_locations = landmark_locations;
 truth.landmark_in_FOV = cell(size(time_vec,2),1);
-truth.body_vel = truth.pos;
-truth.odometry_trans_sigma = 0.02;
-truth.odometry_rot_sigma = 0.01;
-truth.odometry_trans = truth.body_vel;
-truth.odometry_rot = truth.odometry_trans;
 
 truth.sensor_params = sensor;
 
@@ -67,12 +70,12 @@ end
 % Draw first frame
 
 % Generate measurement sets
-[meas, landmark_inFOV] = gen_noisy_meas (pos, quat, landmark_locations, sensor);
+[meas, landmark_inFOV] = gen_noisy_meas (pos(:,1), quat(1,1), landmark_locations, sensor);
 
 truth.landmark_in_FOV{1,1} = landmark_inFOV;
 
 % Reproject meas into world frame for double checking
-meas_world = reproject_meas (pos, quat, meas);
+meas_world = reproject_meas (pos(:,1), quat(1,1), meas);
 
 truth.meas_table{1,1} = meas;
 
@@ -121,37 +124,20 @@ truth.meas_table{1,1} = meas;
 
 %% Run simulation
 for i=2:size(time_vec,2)
-    % Update robot pose
-    traj_hist = horzcat (traj_hist,pos);
-    [pos, quat] = propagate_state(pos, quat, body_vel, body_rot_rate(:,i), dt);
-
-    %% Add noise to odometry
-    trans_noise = randn(1) * truth.odometry_trans_sigma;
-    rot_noise = randn(1) * truth.odometry_rot_sigma;
-
     % Generate measurement sets
-    [meas, landmark_inFOV] = gen_noisy_meas (pos, quat, landmark_locations, sensor);
+    [meas, landmark_inFOV] = gen_noisy_meas (pos(:,i), quat(i,:), landmark_locations, sensor);
     
 
     % Reproject meas into world frame for double checking
-    meas_world = reproject_meas (pos, quat, meas);
+    meas_world = reproject_meas (pos(:,i), quat(i,:), meas);
     
-    truth.pos(:,i) = pos;
-    truth.quat(i,:) = quat;
-    truth.body_trans_vel(:,i) = body_vel;
-    truth.body_rot_vel(:,i) = body_rot_rate(:,i);
     truth.landmark_in_FOV{i,1} = landmark_inFOV;
     truth.meas_table{i,1} = meas;
-    truth.odometry_trans(:,i) = body_vel + trans_noise;
-    truth.odometry_rot(:,i) = body_rot_rate(:,i) + rot_noise;
-    truth.odometry_trans(2:3,i) = [0;0];
-    truth.odometry_rot(1:2,i) = [0;0];
-
 
     if draw
         % Plotting
         figure(1)
-        draw_trajectory(pos, quat, traj_hist, 1, 10, 2,'k',false);
+        draw_trajectory(pos(:,i), quat(i,:), pos(:,1:i-1), 1, 10, 2,'k',false);
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
@@ -165,7 +151,7 @@ for i=2:size(time_vec,2)
         zlabel("Z");
         %xlim([-(map_size + 5), (map_size + 5)])
         %ylim([-(map_size + 5), (map_size + 5)])
-        axis square
+        axis equal
         indx_name = pad(sprintf('%d',i), 3, 'left','0');
     
         % figure(2)
