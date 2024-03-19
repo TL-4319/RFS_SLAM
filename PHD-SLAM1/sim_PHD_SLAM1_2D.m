@@ -48,7 +48,7 @@ odom.body_rot_vel(1:2,:) = zeros(2,size(odom.body_trans_vel,2));
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 20;
+filter_params.num_particle = 1000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
 filter_params.motion_sigma = [0.2; 0.2; 0; 0; 0; 0.1];
