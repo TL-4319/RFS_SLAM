@@ -8,7 +8,7 @@ rng(69431);
 dt = 0.2;
 time_vec = 0:dt:160;
 draw = true;
-%% Generate landmark map
+%% Generate landmark map - MAP ARE RANDOM
 map_size = 150;
 num_landmark = 3000;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
@@ -24,7 +24,7 @@ sensor.P_d = 0.9;
 sensor.clutter_rate = 2;
 sensor.sigma = 0.1;
 
-% Generate trajectory
+% Generate trajectory - EDIT HERE TO CHANGE ROBOT PATH
 waypoints = [0,0,0; ... % Initial position
              20, 10, 0;...
              20, 60, 0; ...

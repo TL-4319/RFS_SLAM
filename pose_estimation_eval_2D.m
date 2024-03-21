@@ -5,25 +5,19 @@ clc;
 addpath('util/')
 
 %% Parse data
-% Parse estimations
-load ("PHD_SLAM1/sim_data_output/est_output_1000_part_dataset7.mat");
-
-% Parse measurement table
-%load ("dataset/meas_table_2.mat");
-
-% Parse truth data
-load ("dataset/truth_7.mat")
+% Parse simulation
+load ("PHD-SLAM1/sim_data_output/test_new_sim_2D.mat");
 
 %% 
-time_vec = truth.time_vec;
+time_vec = simulation.truth.time_vec;
 dt = time_vec(2) - time_vec(1);
 
 % Position 
-est_pos = est.pos;
-true_pos = truth.pos;
+est_pos = simulation.est.pos;
+true_pos = simulation.truth.pos;
 
-est_quat = est.quat;
-true_quat = truth.quat;
+est_quat = simulation.est.quat;
+true_quat = simulation.truth.quat;
 
 % Convert to euler [yaw, pitch, roll]
 est_euler = transpose(quat2eul(est_quat));
@@ -37,11 +31,11 @@ dist_travel = vecnorm(dist_travel);
 dist_travel = cumsum(dist_travel);
 
 %% Propagate only odometry
-odom_pos = truth.pos;
-odom_quat = truth.quat;
+odom_pos = true_pos;
+odom_quat = true_quat;
 for tt = 2:size(time_vec,2)
     [odom_pos(:,tt),odom_quat(tt,:)] = propagate_state(odom_pos(:,tt-1), odom_quat(tt-1,:), ...
-        truth.odometry_trans(:,tt), truth.odometry_rot(:,tt), dt); 
+        simulation.odom.body_trans_vel(:,tt), simulation.odom.body_rot_vel(:,tt), dt); 
 end
 odom_euler = transpose(quat2eul(odom_quat));
 %% Error calc
@@ -106,8 +100,8 @@ title("Rotational error")
 legend
 
 figure (4)
-draw_trajectory(truth.pos(:,end), truth.quat(end,:), truth.pos, 4, 10, 2, 'k', false)
-draw_trajectory(est.pos(:,end), est.quat(end,:), est.pos, 4, 10, 2,'g',true);
+draw_trajectory(simulation.truth.pos(:,end), simulation.truth.quat(end,:), simulation.truth.pos, 4, 10, 2, 'k', false)
+draw_trajectory(simulation.est.pos(:,end), simulation.est.quat(end,:), simulation.est.pos, 4, 10, 2,'g',true);
 draw_trajectory(odom_pos(:,end), odom_quat(end,:),odom_pos, 4, 10, 2,'r',true);
 hold on
 set(gca, 'Zdir', 'reverse')
@@ -116,5 +110,6 @@ grid on
 view([0,90])
 plot ([0,0], [0,0],'k','DisplayName','True trajectory')
 plot ([0,0], [0,0],'g','DisplayName','Estimated trajectory')
+plot ([0,0], [0,0],'g','DisplayName','Odometry trajectory')
 legend
 
