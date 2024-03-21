@@ -5,7 +5,7 @@ clc;
 
 %%
 rng(42069);
-draw = true;
+draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
@@ -36,7 +36,7 @@ est.num_effective_part = est.compute_time;
 %% Odometry configuration
 %% Odometry parameters
 odom.sigma_trans = [0.3; 0.3; 0.3];
-odom.sigma_rot = [0.01; 0.01; 0.01];
+odom.sigma_rot = [0.01; 0.01; 0.05];
 odom.body_trans_vel = truth.body_trans_vel + ...
     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
 odom.body_rot_vel = truth.body_rot_vel + ...
@@ -51,7 +51,7 @@ filter_params.resample_scheme = 1; % 0 is no resampling, 1 is resample at every 
 filter_params.resample_trigger = 0;
 filter_params.num_particle = 100;
 filter_params.intial_particle_cov = diag([0.01, 0.01, 0.01, 0.001, 0.001, 0.001, 0.001]).^2;
-filter_params.process_noise = diag([0.1 0.1 0.1 0.1 0.1 0.1]).^2;
+filter_params.process_noise = diag([0.3 0.3 0.3 0.01 0.01 0.1]).^2;
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
@@ -81,7 +81,7 @@ particles = init_phd_particles (filter_params.num_particle, cur_pos, cur_quat, .
 
 %% Run simulation
 for i = 2:size(time_vec,2)
-    disp (time_vec(i));
+    
 
     %% Parse some truth data
     meas = truth.meas_table{i,1};
@@ -219,6 +219,15 @@ for i = 2:size(time_vec,2)
                     cur_particle.pos = temp_traj(1:3,1);
                     cur_particle.quat = quaternion(temp_traj(4,1),...
                         temp_traj(5,1), temp_traj(6,1), temp_traj(7,1));
+
+                    % Constraint to 2D
+                    cur_particle.pos(3) = 0;
+                    euler = quat2eul(cur_particle.quat);
+                    euler(2:3) = zeros(1,2);
+                    temp_quat = eul2quat(euler);
+                    cur_particle.quat = quaternion(temp_quat(1,1),...
+                        temp_quat(1,2), temp_quat(1,3), temp_quat(1,4));
+
                     wei_importance = 1/ sqrt(det(2*pi*pred_P)) * exp(-0.5 * (temp_traj - pred_traj)' *...
                         pinv(pred_P) * (temp_traj - pred_traj)) / ...
                         (1/sqrt(det(2 * pi * Pup)) * exp(-0.5 * (temp_traj-trajest)' * ...

@@ -110,6 +110,6 @@ grid on
 view([0,90])
 plot ([0,0], [0,0],'k','DisplayName','True trajectory')
 plot ([0,0], [0,0],'g','DisplayName','Estimated trajectory')
-plot ([0,0], [0,0],'g','DisplayName','Odometry trajectory')
+plot ([0,0], [0,0],'r','DisplayName','Odometry trajectory')
 legend
 
