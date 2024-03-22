@@ -4,13 +4,13 @@ clear;
 clc;
 
 %% 
-rng(42069);
-draw = true;
+rng(420);
+draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_2D_1.mat');
+load('../dataset/truth_2D_2.mat');
 
 %% Time vector
 time_vec = truth.time_vec;
@@ -35,8 +35,8 @@ est.compute_time = zeros (1,size(time_vec,2));
 
 %% Odometry configuration
 %% Odometry parameters
-odom.sigma_trans = [0.3; 0.3; 0.3];
-odom.sigma_rot = [0.01; 0.01; 0.01];
+odom.sigma_trans = [0.5; 0.5; 0.5];
+odom.sigma_rot = [0.01; 0.01; 0.2];
 odom.body_trans_vel = truth.body_trans_vel + ...
     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
 odom.body_rot_vel = truth.body_rot_vel + ...
@@ -48,10 +48,10 @@ odom.body_rot_vel(1:2,:) = zeros(2,size(odom.body_trans_vel,2));
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 1000;
+filter_params.num_particle = 10;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
-filter_params.motion_sigma = [0.2; 0.2; 0; 0; 0; 0.1];
+filter_params.motion_sigma = [0.5; 0.5; 0; 0; 0; 0.2];
 
 % Map PHD config. Dedault value for birth value
 filter_params.birthGM_intensity = 0.1;
@@ -68,8 +68,8 @@ filter_params.P_d = 0.8;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 1;
-filter_params.num_GM_cap = 1000;
+filter_params.merge_dist = 4;
+filter_params.num_GM_cap = 3000;
 
 est.filter_params = filter_params;
 

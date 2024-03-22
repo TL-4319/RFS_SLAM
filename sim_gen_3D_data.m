@@ -6,19 +6,19 @@ clc;
 addpath("util/")
 rng(69431);
 dt = 0.2;
-draw = true;
+draw = false;
 %% Generate landmark map
 map_size = 100;
 num_landmark = 2000;
 landmark_locations = vertcat((rand(1,num_landmark)-0.2) * 2 * map_size ,...
-    (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.5) * 0.5 * map_size);
+    (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.5) * 2 * map_size);
 marker_size = ones(size(landmark_locations,2),1) * 10;
 
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(110);
 sensor.VFOV = deg2rad(70);
-sensor.max_range = 40;
+sensor.max_range = 50;
 sensor.min_range = 0.4;
 sensor.P_d = 0.8;
 sensor.clutter_rate = 2;
@@ -124,7 +124,7 @@ truth.meas_table{1,1} = meas;
 
 %% Run simulation
 for i=2:size(time_vec,2)
-
+    disp(time_vec(i))
     % Generate measurement sets
     [meas, landmark_inFOV] = gen_noisy_3D_meas (pos(:,i), quat(i,:), landmark_locations, sensor);
     

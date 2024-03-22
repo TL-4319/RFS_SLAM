@@ -4,13 +4,13 @@ clear;
 clc;
 
 %%
-rng(42069);
+rng(420);
 draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_2D_1.mat');
+load('../dataset/truth_2D_2.mat');
 
 %% Time vector 
 time_vec = truth.time_vec;
@@ -35,8 +35,8 @@ est.num_effective_part = est.compute_time;
 
 %% Odometry configuration
 %% Odometry parameters
-odom.sigma_trans = [0.3; 0.3; 0.3];
-odom.sigma_rot = [0.01; 0.01; 0.05];
+odom.sigma_trans = [0.5; 0.5; 0.3];
+odom.sigma_rot = [0.01; 0.01; 0.2];
 odom.body_trans_vel = truth.body_trans_vel + ...
     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
 odom.body_rot_vel = truth.body_rot_vel + ...
@@ -49,9 +49,9 @@ odom.body_rot_vel(1:2,:) = zeros(2,size(odom.body_trans_vel,2));
 %% SLAM configuration
 filter_params.resample_scheme = 1; % 0 is no resampling, 1 is resample at every step, 2 is adaptive resample
 filter_params.resample_trigger = 0;
-filter_params.num_particle = 100;
+filter_params.num_particle = 1;
 filter_params.intial_particle_cov = diag([0.01, 0.01, 0.01, 0.001, 0.001, 0.001, 0.001]).^2;
-filter_params.process_noise = diag([0.3 0.3 0.3 0.01 0.01 0.1]).^2;
+filter_params.process_noise = diag([0.6 0.6 0.00001 0.00001 0.000001 0.3]).^2;
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
@@ -64,12 +64,12 @@ filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, 0.00001]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
 filter_params.clutter_intensity = 50 / (20^2 * 0.3 * pi);
-filter_params.P_d = 0.8;
+filter_params.P_d = 0.9;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 1;
-filter_params.num_GM_cap = 1000;
+filter_params.merge_dist = 4;
+filter_params.num_GM_cap = 3000;
 
 %% Initialize SLAM particles
 cur_pos = est.pos(:,1);
@@ -427,7 +427,8 @@ for i = 2:size(time_vec,2)
         draw_phd(max_likeli_gm_mu, max_likeli_gm_cov, max_likeli_gm_inten,[-50 250], truth.landmark_locations,"Test")
         %exportgraphics(fig2, "phd5.gif", Append=true);
         drawnow;
-    end
+     end
+     disp(time_vec(i));
 end % END OF EACH TIMESTEP
 
 %% Extract all data to one structure for saving
