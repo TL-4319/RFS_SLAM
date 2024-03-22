@@ -18,7 +18,7 @@ landmark_locations = landmark_locations';
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(100);
-sensor.max_range = 20;
+sensor.max_range = 40;
 sensor.min_range = 0.4;
 sensor.P_d = 0.9;
 sensor.clutter_rate = 2;

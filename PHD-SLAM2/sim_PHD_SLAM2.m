@@ -53,6 +53,7 @@ filter_params.num_particle = 1;
 filter_params.intial_particle_cov = diag([0.01, 0.01, 0.01, 0.001, 0.001, 0.001, 0.001]).^2;
 filter_params.process_noise = diag([0.6 0.6 0.00001 0.00001 0.000001 0.3]).^2;
 
+
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
 filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.0001];

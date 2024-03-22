@@ -35,7 +35,7 @@ est.compute_time = zeros (1,size(time_vec,2));
 
 %% Odometry configuration
 %% Odometry parameters
-odom.sigma_trans = [0.5; 0.5; 0.5];
+odom.sigma_trans = [0.5; 0.5; 0.3];
 odom.sigma_rot = [0.01; 0.01; 0.2];
 odom.body_trans_vel = truth.body_trans_vel + ...
     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
@@ -51,7 +51,11 @@ odom.body_rot_vel(1:2,:) = zeros(2,size(odom.body_trans_vel,2));
 filter_params.num_particle = 10;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % Use 3D navigator motion model. z, phi, theta are 0 to maintain 2D for now
+<<<<<<< Updated upstream
 filter_params.motion_sigma = [0.5; 0.5; 0; 0; 0; 0.2];
+=======
+filter_params.motion_sigma = [0.6; 0.6; 0; 0; 0; 0.3];
+>>>>>>> Stashed changes
 
 % Map PHD config. Dedault value for birth value
 filter_params.birthGM_intensity = 0.1;
@@ -64,7 +68,7 @@ filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, 0.00001]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
 filter_params.clutter_intensity = 50 / (20^2 * 0.3 * pi);
-filter_params.P_d = 0.8;
+filter_params.P_d = 0.9;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;

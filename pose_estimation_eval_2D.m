@@ -6,7 +6,8 @@ addpath('util/')
 
 %% Parse data
 % Parse simulation
-load ("PHD-SLAM2/sim_data_output/phd_slam2_1.mat");
+load ("sim-result/phd-slam1-10.mat");
+
 
 %% 
 time_vec = simulation.truth.time_vec;
