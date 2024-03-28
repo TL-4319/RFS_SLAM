@@ -45,6 +45,7 @@ odom.body_rot_vel = truth.body_rot_vel + ...
 %% SLAM configuration
 filter_params.resample_scheme = 1; % 0 is no resampling, 1 is resample at every step, 2 is adaptive resample
 filter_params.resample_trigger = 0;
+
 filter_params.num_particle = 1;
 filter_params.intial_particle_cov = diag([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]).^2;
 filter_params.process_noise = diag([0.3 0.3 0.3 0.3 0.3 0.3]).^2;
@@ -57,7 +58,7 @@ filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.2];
 filter_params.map_Q = diag([0.2, 0.2, 0.2]);
 filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
-    filter_params.filter_sensor_noise^2, 0.00001]);
+    filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise.^2]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
 filter_params.clutter_intensity = 50 / (20^2 * 0.3 * pi);
 filter_params.P_d = 0.9;
@@ -66,6 +67,8 @@ filter_params.P_d = 0.9;
 filter_params.pruning_thres = 10^-5;
 filter_params.merge_dist = 4;
 filter_params.num_GM_cap = 3000;
+
+est.filter_params = filter_params;
 
 %% Initialize SLAM particles
 cur_pos = est.pos(:,1);
@@ -101,13 +104,16 @@ for i = 2:size(time_vec,2)
 
         [cur_particle.pos, cur_particle.quat] = propagate_state(cur_particle.pos, cur_particle.quat,...
             trans_odom, rot_odom, dt);
+        % Subtitute with true pose
+        cur_particle.pos = truth.pos(:,i);
+        cur_particle.quat = truth.quat(i,1);
         cur_particle.P = F * cur_particle.P * F' + Q * filter_params.process_noise * Q';
         pred_traj = [cur_particle.pos; compact(cur_particle.quat)'];
         pred_P = cur_particle.P;
 
         %% Map prediction
         % Check for GM in FOV
-        [~, GM_in_FOV] = check_in_FOV_2D (cur_particle.gm_mu, ...
+        [~, GM_in_FOV] = check_in_FOV_3D (cur_particle.gm_mu, ...
                 cur_particle.pos, cur_particle.quat, truth.sensor_params);
         
         %% Extract GM components not in FOV. No changes are made to them
@@ -230,7 +236,11 @@ for i = 2:size(time_vec,2)
             else
                 wei_importance = 1;
             end
-            particles(par_ind) = cur_particle;
+            % Subtitute with true pose
+            cur_particle.pos = truth.pos(:,i);
+            cur_particle.quat = truth.quat(i,1);
+            particles(1,par_ind).pos = cur_particle.pos;
+            particles(1,par_ind).quat = cur_particle.quat;
 
             %% Normal PHD-SLAM1 update based on new proposal trajectory
             GM_cov_in_prev = GM_cov_in;
@@ -250,7 +260,7 @@ for i = 2:size(time_vec,2)
                     pred_z = gen_pred_meas(cur_particle.pos, cur_particle.quat, GM_mu_in_prev(:,kk));
                     zdiff = meas(:,jj) - pred_z;
                     likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
-                        exp(-0.5*(zdiff)'*pinv(filter_params.R)*zdiff ) * ...
+                        exp(-0.5*(zdiff)'*inv(filter_params.R)*zdiff ) * ...
                         GM_inten_in_prev(kk);
                 end
                 likelipz(1,jj) = filter_params.clutter_intensity + sum(likelipf,2);
@@ -387,7 +397,7 @@ for i = 2:size(time_vec,2)
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
-        view([0,90])
+        %view([0,90])
         
         scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),'k')
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
@@ -407,16 +417,17 @@ for i = 2:size(time_vec,2)
         axis square
         title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
         title(title_str)
-        exportgraphics(fig1, "map.gif", Append=true);
+        % exportgraphics(fig1, "map.gif", Append=true);
 
-        figure(2)
-        draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
-        hold on
-        draw_phd(max_likeli_gm_mu, max_likeli_gm_cov, max_likeli_gm_inten,[-50 250], truth.landmark_locations,"Test")
-        %exportgraphics(fig2, "phd5.gif", Append=true);
+        % figure(2)
+        % draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
+        % hold on
+        % draw_phd(max_likeli_gm_mu, max_likeli_gm_cov, max_likeli_gm_inten,[-50 250], truth.landmark_locations,"Test")
+        % %exportgraphics(fig2, "phd5.gif", Append=true);
         drawnow;
      end
-     disp(time_vec(i));
+     dbg_str = sprintf("timestep %f, num_landmark %d",time_vec(i),exp_num_landmark);
+     disp(dbg_str);
 end % END OF EACH TIMESTEP
 
 %% Extract all data to one structure for saving
@@ -424,3 +435,31 @@ simulation.truth = truth;
 simulation.odom = odom;
 simulation.est = est;
 simulation.filter_params = filter_params;
+
+figure(1)
+draw_trajectory(truth.pos(:,i), truth.quat(i,:), truth.pos(:,1:i), 1, 10, 2,'k',false);
+draw_trajectory(est.pos(:,i), est.quat(i,:), est.pos(:,1:i), 1, 10, 2,'g',true);
+hold on
+set(gca, 'Zdir', 'reverse')
+set(gca, 'Ydir', 'reverse')
+grid on
+%view([0,90])
+
+scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),'k')
+scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
+scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
+%for j=1:size(particles,2)
+%    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
+%end
+hold off
+%draw_particle_pos(particles,1)
+xlabel("X");
+ylabel("Y");
+zlabel("Z");
+%xlim([-(map_size + 5), (map_size + 5)])
+%ylim([-(map_size + 5), (map_size + 5)])
+xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
+ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
+axis square
+title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
+title(title_str)

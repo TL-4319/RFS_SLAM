@@ -84,7 +84,6 @@ particles = init_phd_particles (filter_params.num_particle, cur_pos, cur_quat, .
 
 %% Run simulation
 for i=2:size(time_vec,2)
-    disp (time_vec(i));
     % map_png_name = sprintf ("/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/map/%s.png",pad(sprintf('%d',i), 3, 'left','0'));
     % figure(1)
     % imshow(map_png_name);
@@ -121,8 +120,8 @@ for i=2:size(time_vec,2)
             cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);
 
         % Give particle truth pose for map debug
-        %cur_particle.pos = truth.pos(:,i);
-        %cur_particle.quat = truth.quat(i,:);
+        cur_particle.pos = truth.pos(:,i);
+        cur_particle.quat = truth.quat(i,:);
 
         particles(1,par_ind).pos = cur_particle.pos;
         particles(1,par_ind).quat = cur_particle.quat;
@@ -330,8 +329,38 @@ for i=2:size(time_vec,2)
         % draw_phd(max_likeli_gm_mu, max_likeli_gm_cov, max_likeli_gm_inten,[-30 150], truth.landmark_locations,"Test")
         % %exportgraphics(fig2, "phd5.gif", Append=true);
         % drawnow;
-    end
+     end
+     dbg_str = sprintf("timestep %f, num_landmark %d",time_vec(i),exp_num_landmark);
+     disp(dbg_str);
 end
 simulation.est = est;
 simulation.truth = truth;
 simulation.odom = odom;
+
+figure(1)
+draw_trajectory(truth.pos(:,i), truth.quat(i,:), truth.pos(:,1:i), 1, 10, 2,'k',false);
+draw_trajectory(est.pos(:,i), est.quat(i,:), est.pos(:,1:i), 1, 10, 2,'g',true);
+hold on
+set(gca, 'Zdir', 'reverse')
+set(gca, 'Ydir', 'reverse')
+grid on
+%view([0,90])
+
+scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),'k')
+scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
+scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
+%for j=1:size(particles,2)
+%    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
+%end
+hold off
+%draw_particle_pos(particles,1)
+xlabel("X");
+ylabel("Y");
+zlabel("Z");
+%xlim([-(map_size + 5), (map_size + 5)])
+%ylim([-(map_size + 5), (map_size + 5)])
+xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
+ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
+axis square
+title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
+title(title_str)
