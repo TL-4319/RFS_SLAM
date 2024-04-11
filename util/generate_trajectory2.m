@@ -1,4 +1,4 @@
-function [pos, orientation, vel_body, acc_body, acc_world, rot_vel_body,rot_vel_world,time_vec] = generate_trajectory2 (pos_wp,...
+function [pos, orientation, vel_body, vel_world, acc_body, acc_world, rot_vel_body,rot_vel_world,time_vec] = generate_trajectory2 (pos_wp,...
     orientation_wp, speed_wp, dt)
     
     trajectory = waypointTrajectory(pos_wp, GroundSpeed=speed_wp, ...
@@ -12,6 +12,7 @@ function [pos, orientation, vel_body, acc_body, acc_world, rot_vel_body,rot_vel_
     rot_vel_body = [];
     acc_world = [];
     rot_vel_world = [];
+    vel_world = [];
     
     while ~isDone(trajectory)
         [cur_pos, cur_orientation, cur_vel_world, cur_acc_world, cur_rot_vel] = trajectory();
@@ -22,6 +23,7 @@ function [pos, orientation, vel_body, acc_body, acc_world, rot_vel_body,rot_vel_
         cur_acc_body = rotateframe(cur_orientation, cur_acc_world);
         cur_rot_vel_body = rotateframe(cur_orientation, cur_rot_vel);
         vel_body = horzcat(vel_body, cur_vel_body');
+        vel_world = horzcat(vel_world, cur_vel_world');
         acc_body = horzcat(acc_body, cur_acc_body');
         rot_vel_body = horzcat(rot_vel_body, cur_rot_vel_body');
         time_vec = horzcat(time_vec, cur_time);

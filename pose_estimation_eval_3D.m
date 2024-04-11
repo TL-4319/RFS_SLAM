@@ -6,7 +6,7 @@ addpath('util/')
 
 %% Parse data
 % Parse estimations
-load ("PHD_SLAM1/sim_data_output/20240225_sim_3D.mat");
+load ("sim-result/3d/phd-slam2-100-2.mat");
 
 % Parse measurement table
 %load ("dataset/meas_table_2.mat");
@@ -67,9 +67,9 @@ odom_euler_error = odom_euler - true_euler;
 %% Plot
 figure(1)
 subplot (3,1,1)
-plot (time_vec, abs(pos_error(1,:)),'DisplayName','PHD-SLAM')
+plot (time_vec, abs(pos_error(1,:)),'DisplayName','PHD-SLAM','LineWidth',2)
 hold on 
-plot (time_vec, abs(odom_pos_error(1,:)),'DisplayName','Odometry')
+plot (time_vec, abs(odom_pos_error(1,:)),'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("error (m)")
 grid on
@@ -77,27 +77,27 @@ title("X error")
 legend
 
 subplot (3,1,2)
-plot (time_vec, abs(pos_error(2,:)),'DisplayName','PHD-SLAM')
+plot (time_vec, abs(pos_error(2,:)),'DisplayName','PHD-SLAM','LineWidth',2)
 hold on
-plot (time_vec, abs(odom_pos_error(2,:)),'DisplayName','Odometry')
+plot (time_vec, abs(odom_pos_error(2,:)),'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("error (m)")
 grid on
 title("Y error")
 
 subplot (3,1,3)
-plot (time_vec, abs(pos_error(3,:)),'DisplayName','PHD-SLAM')
+plot (time_vec, abs(pos_error(3,:)),'DisplayName','PHD-SLAM','LineWidth',2)
 hold on
-plot (time_vec, abs(odom_pos_error(3,:)),'DisplayName','Odometry')
+plot (time_vec, abs(odom_pos_error(3,:)),'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("error (m)")
 grid on
 title("Z error")
 
 figure(2)
-plot (time_vec, dist_error,'DisplayName','PHD-SLAM')
+plot (time_vec, dist_error,'DisplayName','PHD-SLAM','LineWidth',2)
 hold on
-plot (time_vec, odom_dis_error,'DisplayName','Odometry')
+plot (time_vec, odom_dis_error,'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("error (m)")
 grid on
@@ -106,9 +106,9 @@ legend
 
 figure(3)
 subplot(3,1,1)
-plot (time_vec, abs(euler_error(3,:)) * 180/pi,'DisplayName','PHD-SLAM')
+plot (time_vec, abs(euler_error(3,:)) * 180/pi,'DisplayName','PHD-SLAM','LineWidth',2)
 hold on
-plot (time_vec, abs(odom_euler_error(3,:)) * 180/pi, 'DisplayName','Odometry')
+plot (time_vec, abs(odom_euler_error(3,:)) * 180/pi, 'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("Roll error (deg)")
 grid on
@@ -116,18 +116,18 @@ title("Rotational error")
 legend
 
 subplot(3,1,2)
-plot (time_vec, abs(euler_error(2,:)) * 180/pi,'DisplayName','PHD-SLAM')
+plot (time_vec, abs(euler_error(2,:)) * 180/pi,'DisplayName','PHD-SLAM','LineWidth',2)
 hold on
-plot (time_vec, abs(odom_euler_error(2,:)) * 180/pi, 'DisplayName','Odometry')
+plot (time_vec, abs(odom_euler_error(2,:)) * 180/pi, 'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("Pitch error (deg)")
 grid on
 
 
 subplot(3,1,3)
-plot (time_vec, abs(euler_error(1,:)) * 180/pi,'DisplayName','PHD-SLAM')
+plot (time_vec, abs(euler_error(1,:)) * 180/pi,'DisplayName','PHD-SLAM','LineWidth',2)
 hold on
-plot (time_vec, abs(odom_euler_error(1,:)) * 180/pi, 'DisplayName','Odometry')
+plot (time_vec, abs(odom_euler_error(1,:)) * 180/pi, 'DisplayName','Odometry','LineWidth',2)
 xlabel("Time (s)")
 ylabel("Yaw error (deg)")
 grid on
