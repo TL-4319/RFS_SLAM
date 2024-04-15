@@ -9,25 +9,25 @@ dt = 0.2;
 draw = false;
 
 image_rate = 5;
-imu_rate = 100;
+imu_rate = 200;
 
 image_dt = 1/image_rate;
 imu_dt = 1/imu_rate;
 
 %% Generate landmark map
 map_size = 100;
-num_landmark = 2000;
+num_landmark = 3000;
 landmark_locations = vertcat((rand(1,num_landmark)-0.2) * 2 * map_size ,...
-    (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.5) * 2 * map_size);
+    (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.9) * 3);
 marker_size = ones(size(landmark_locations,2),1) * 10;
 
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(110);
 sensor.VFOV = deg2rad(70);
-sensor.max_range = 50;
+sensor.max_range = 20;
 sensor.min_range = 0.4;
-sensor.P_d = 0.8;
+sensor.P_d = 0.9;
 sensor.clutter_rate = 2;
 sensor.sigma = 0.1;
 
@@ -47,21 +47,15 @@ orientation_wp = quaternion([0,0,0; ...
 
 groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero velocity
 
-[pos, quat, trans_vel, acc_body, acc_world, rot_vel, rot_vel_world, imu_time_vec] = generate_trajectory2(waypoints,...
+[pos, quat, trans_vel, vel_world, acc_body, acc_world, rot_vel_body, rot_vel_world, imu_time_vec] = generate_trajectory2(waypoints,...
     orientation_wp, groundspeed, imu_dt);
 
-%% Generate IMU data
-% No bias imu
-IMU_no_bias = imuSensor('accel-gyro','SampleRate',imu_dt);
-% Noise characteristic of IMU
-IMU_no_bias.Accelerometer = accelparams( ...
-    'MeasurementRange',19.62, ...            % m/s^2
-    'NoiseDensity',0.0028);               % m/s^2 / Hz^(1/2)
-
-IMU_no_bias.Gyroscope = gyroparams(...
-    'MeasurementRange',4.363, ...   % rad/s
-    'NoiseDensity', 0.00016);      % rad/s / Hz^(1/2)
-[no_bias_accel, no_bias_gyro] = IMU_no_bias(acc_world', rot_vel', quat);
+%% IMU parameters
+imu_param.gyro_NoiseDensity = 0.0028;
+imu_param.gyro_RandomWalk = 0.000086;
+imu_param.accel_NoiseDensity = 0.00016;
+imu_param.accel_RandomWalk = 0.000022;
+imu_param.dt = dt;
 
 %% Generate img timestamps
 has_img = zeros(size(imu_time_vec));
@@ -83,16 +77,17 @@ end
 %% Prealocate truth data
 truth.pos = pos;
 truth.body_trans_vel = trans_vel;
-truth.body_rot_vel = rot_vel;
-truth.body_trans_accel = acc_body;
+truth.body_rot_vel = rot_vel_body;
+truth.world_accel = acc_world;
+truth.world_rot_vel = rot_vel_world;
 truth.quat = quat;
 truth.imu_time_vec = imu_time_vec;
 truth.landmark_locations = landmark_locations;
 truth.landmark_in_FOV = cell(size(img_time_vec,2),1);
-truth.time_vec = img_time_vec;
+truth.img_time_vec = img_time_vec;
 truth.has_img = has_img;
 truth.img_to_imu_map = find(has_img); %Mapping from img_time_vec corresponding IMU time vec
-
+truth.imu_param = imu_param;
 truth.sensor_params = sensor;
 
 truth.meas_table = cell(size(img_time_vec,2),1);
@@ -154,8 +149,7 @@ truth.meas_table{1,1} = meas;
         % hold off
         % axis square
         
-        map_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/map/','001','.png');
-        meas_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/meas/','001','.png');
+        
         %saveas (fig1,map_name);
         %saveas (fig2, meas_name);
         drawnow
@@ -163,8 +157,9 @@ truth.meas_table{1,1} = meas;
 
 %% Run measurement simulation
 k = 2;
+
 for i=2:size(imu_time_vec,2)
-    disp(imu_time_vec(i))
+    %disp(imu_time_vec(i))
     
     % Only generate measurement at correct time
     if has_img(i) == 1
@@ -177,11 +172,11 @@ for i=2:size(imu_time_vec,2)
         
         truth.landmark_in_FOV{k,1} = landmark_inFOV;
         truth.meas_table{k,1} = meas;
+        dbg_string = sprintf('imu time: %f ; img time: %f',imu_time_vec(i), img_time_vec(k));
         k = k + 1;
-    end
-
-
-    if draw
+        disp (dbg_string);
+        %% Visualize simulation
+        if draw
         % Plotting
         figure(1)
         draw_trajectory(pos(:,i), quat(i,:), pos(:,1:i-1), 1, 10, 2,'k',false);
@@ -217,12 +212,16 @@ for i=2:size(imu_time_vec,2)
         % hold off
         % axis square
         
-        map_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/map/',indx_name,'.png');
-        meas_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/meas/',indx_name,'.png');
+        %map_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/map/',indx_name,'.png');
+        %meas_name = strcat('/home/tuan/Projects/anarsh/visual_RB_PHD_SLAM/meas/',indx_name,'.png');
         %saveas (fig1,map_name);
         %saveas (fig2, meas_name);
         drawnow
     end
+    end
+
+
+    
 end
 
 

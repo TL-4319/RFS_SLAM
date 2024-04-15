@@ -25,36 +25,14 @@ groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero v
 [pos, quat, trans_vel, vel_world, acc_body, acc_world, rot_vel_body, rot_vel_world, imu_time_vec] = generate_trajectory2(waypoints,...
     orientation_wp, groundspeed, dt);
 
+imu_param.gyro_NoiseDensity = 0.0028;
+imu_param.gyro_RandomWalk = 0.000086;
+imu_param.accel_NoiseDensity = 0.00016;
+imu_param.accel_RandomWalk = 0.000022;
+imu_param.dt = dt;
+
 %% Generate IMU data
-% No bias imu
-IMU_no_bias = imuSensor('accel-gyro','SampleRate',dt);
-% Noise characteristic of IMU
-IMU_no_bias.Accelerometer = accelparams( ...
-    'MeasurementRange',19.62, ...            % m/s^2
-    'NoiseDensity',0.0028);               % m/s^2 / Hz^(1/2)
-
-IMU_no_bias.Gyroscope = gyroparams(...
-    'MeasurementRange',4.363, ...   % rad/s
-    'NoiseDensity', 0.00016);      % rad/s / Hz^(1/2)
-[no_bias_accel, no_bias_gyro] = IMU_no_bias(acc_world', rot_vel_world', quat);
-no_bias_accel = no_bias_accel';
-no_bias_gyro = no_bias_gyro';
-
-% Bias imu
-IMU = imuSensor('accel-gyro','SampleRate',dt);
-%Noise characteristic of IMU
-IMU.Accelerometer = accelparams( ...
-    'MeasurementRange',19.62, ...            % m/s^2
-    'NoiseDensity',0.0028, ...      % m/s^2 / Hz^(1/2)
-    'RandomWalk',0.000086);          % m/s^2 * Hz^(1/2)   0.086  
-
-IMU.Gyroscope = gyroparams(...
-    'MeasurementRange',4.363, ...   % rad/s
-    'NoiseDensity', 0.00016,...     % rad/s / Hz^(1/2)
-    'RandomWalk',0.000022);      % rad/s * Hz^(1/2) 0.022
-[imu_accel, imu_gyro] = IMU(acc_world', rot_vel_world', quat);
-imu_accel = imu_accel';
-imu_gyro = imu_gyro';
+imu_meas = generate_imu_measurements(acc_world, rot_vel_world, quat, imu_param);
 
 %% Generate traj from odom
 test_pos = pos;
