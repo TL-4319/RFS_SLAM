@@ -9,12 +9,12 @@ function imu_meas = generate_imu_measurements(acc_world, rot_vel_world, quat, im
     IMU_no_bias = imuSensor('accel-gyro','SampleRate',imu_param.dt);
     % Noise characteristic of IMU
     IMU_no_bias.Accelerometer = accelparams( ...
-        'MeasurementRange',19.62, ...            % m/s^2
-        'NoiseDensity',imu_param.accel_NoiseDensity);               % m/s^2 / Hz^(1/2)
+        'MeasurementRange',19.62, ...            
+        'NoiseDensity',imu_param.accel_NoiseDensity);               
     
     IMU_no_bias.Gyroscope = gyroparams(...
-        'MeasurementRange',4.363, ...   % rad/s
-        'NoiseDensity', imu_param.gyro_NoiseDensity);      % rad/s / Hz^(1/2)
+        'MeasurementRange',4.363, ...   
+        'NoiseDensity', imu_param.gyro_NoiseDensity);      
     [no_bias_accel, no_bias_gyro] = IMU_no_bias(acc_world', rot_vel_world', quat);
     no_bias_imu.accel = no_bias_accel';
     no_bias_imu.gyro = no_bias_gyro';
@@ -24,14 +24,14 @@ function imu_meas = generate_imu_measurements(acc_world, rot_vel_world, quat, im
     IMU = imuSensor('accel-gyro','SampleRate',imu_param.dt);
     %Noise characteristic of IMU
     IMU.Accelerometer = accelparams( ...
-        'MeasurementRange',19.62, ...            % m/s^2
-        'NoiseDensity',imu_param.accel_NoiseDensity, ...      % m/s^2 / Hz^(1/2)
-        'RandomWalk',imu_param.accel_RandomWalk);          % m/s^2 * Hz^(1/2)   0.086  
+        'MeasurementRange',19.62, ...            
+        'NoiseDensity',imu_param.accel_NoiseDensity, ...      
+        'ConstantBias',imu_param.accel_Bias);           
     
     IMU.Gyroscope = gyroparams(...
-        'MeasurementRange',4.363, ...   % rad/s
-        'NoiseDensity', imu_param.gyro_NoiseDensity,...     % rad/s / Hz^(1/2)
-        'RandomWalk',imu_param.gyro_RandomWalk);      % rad/s * Hz^(1/2) 0.022
+        'MeasurementRange',4.363, ...   
+        'NoiseDensity', imu_param.gyro_NoiseDensity,...     
+        'ConstantBias',imu_param.gyro_Bias);     
     [imu_accel, imu_gyro] = IMU(acc_world', rot_vel_world', quat);
     imu.accel = imu_accel';
     imu.gyro = imu_gyro';

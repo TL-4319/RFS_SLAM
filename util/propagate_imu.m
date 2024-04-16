@@ -1,4 +1,4 @@
-function [pos, vel, quat, gyro_bias] = propagate_imu (prev_pos, prev_vel, prev_quat, imu_accel, imu_gyro, prev_gyro_bias, grav_vec, dt)
+function [pos, vel, quat, gyro_bias, accel_bias] = propagate_imu (prev_pos, prev_vel, prev_quat, imu_accel, imu_gyro, prev_gyro_bias, prev_accel_bias, grav_vec, dt)
     % Propagate quaternion - https://ahrs.readthedocs.io/en/latest/filters/angular.html
     body_rot_vel = imu_gyro - prev_gyro_bias;
     quat = rotate_quat(prev_quat, body_rot_vel, dt);
@@ -7,7 +7,7 @@ function [pos, vel, quat, gyro_bias] = propagate_imu (prev_pos, prev_vel, prev_q
     RotM = quat2rot(prev_quat_vec, "point");
     
     % imu measurement to body accel (due to imu report specific force)
-    imu_accel = -imu_accel;
+    imu_accel = -imu_accel + prev_accel_bias;
 
     if norm(grav_vec) > 0.1
         pos = prev_pos + dt * prev_vel + dt^2 *0.5 * RotM * imu_accel + dt^2 * 0.5 * grav_vec; 
@@ -18,6 +18,7 @@ function [pos, vel, quat, gyro_bias] = propagate_imu (prev_pos, prev_vel, prev_q
         vel = prev_vel + dt * RotM * imu_accel;
     end
     gyro_bias = prev_gyro_bias;
+    accel_bias = prev_accel_bias;
 end
 
 function quat = rotate_quat(prev_quat, body_rot_vel, dt)

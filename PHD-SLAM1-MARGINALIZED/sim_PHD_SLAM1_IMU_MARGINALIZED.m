@@ -34,11 +34,11 @@ est.compute_time = zeros(1,size(imu_time_vec,2));
 
 %% Generate IMU measurements
 % IMU parameters
-imu_param.accel_NoiseDensity = 0.0028;
-imu_param.accel_RandomWalk = 0.000086;
-imu_param.gyro_NoiseDensity = 0.00016;
-imu_param.gyro_RandomWalk = 0.0000022;
-imu_param.dt = imu_dt;
+imu_param.gyro_NoiseDensity = 0.0028; % rad/s / Hz^(1/2)
+imu_param.gyro_Bias = [-1, 2, 3] * 10^-2; % gyro constant bias term (rad)
+imu_param.accel_NoiseDensity = 0.00016; % m/s^2 / Hz^(1/2)
+imu_param.accel_Bias = [-9, 9, 9] * 10^-2; % accel constant bias term (m/s)
+imu_param.dt = dt;
 
 % Generate IMU meas
 imu_meas = generate_imu_measurements(truth.world_accel, truth.world_rot_vel, truth.quat, imu_param);
