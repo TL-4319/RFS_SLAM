@@ -10,9 +10,9 @@ function R = quat2rot(quat,rotation_frame)
     qy = quat(3);
     qz = quat(4);
     
-    % "frame" is equivalent to rotation from body to world
+    % "frame" is equivalent to rotation from world to body
 
-    if rotation_frame == "point" % Equivalent to rotation from world to body
+    if rotation_frame == "point" % Equivalent to rotation from body to world
         qx = -qx;
         qy = -qy;
         qz = -qz;

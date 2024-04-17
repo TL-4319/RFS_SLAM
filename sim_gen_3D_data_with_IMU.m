@@ -9,7 +9,7 @@ dt = 0.2;
 draw = false;
 
 image_rate = 5;
-imu_rate = 200;
+imu_rate = 100;
 
 image_dt = 1/image_rate;
 imu_dt = 1/imu_rate;
@@ -50,12 +50,6 @@ groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero v
 [pos, quat, trans_vel, vel_world, acc_body, acc_world, rot_vel_body, rot_vel_world, imu_time_vec] = generate_trajectory2(waypoints,...
     orientation_wp, groundspeed, imu_dt);
 
-%% IMU parameters
-imu_param.gyro_NoiseDensity = 0.0028;
-imu_param.gyro_RandomWalk = 0.000086;
-imu_param.accel_NoiseDensity = 0.00016;
-imu_param.accel_RandomWalk = 0.000022;
-imu_param.dt = dt;
 
 %% Generate img timestamps
 has_img = zeros(size(imu_time_vec));
@@ -79,6 +73,7 @@ truth.pos = pos;
 truth.body_trans_vel = trans_vel;
 truth.body_rot_vel = rot_vel_body;
 truth.world_accel = acc_world;
+truth.world_vel = vel_world;
 truth.world_rot_vel = rot_vel_world;
 truth.quat = quat;
 truth.imu_time_vec = imu_time_vec;
@@ -87,7 +82,6 @@ truth.landmark_in_FOV = cell(size(img_time_vec,2),1);
 truth.img_time_vec = img_time_vec;
 truth.has_img = has_img;
 truth.img_to_imu_map = find(has_img); %Mapping from img_time_vec corresponding IMU time vec
-truth.imu_param = imu_param;
 truth.sensor_params = sensor;
 
 truth.meas_table = cell(size(img_time_vec,2),1);

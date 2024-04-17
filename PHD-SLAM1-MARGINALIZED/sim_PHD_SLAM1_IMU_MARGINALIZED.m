@@ -5,12 +5,12 @@ clc;
 
 %% 
 rng(307);
-draw = false;
+draw = true;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_3D_imu_0_200hz.mat');
+load('../dataset/truth_3D_imu_0_100hz.mat');
 marker_size = ones(size(truth.landmark_locations,2),1) * 10;
 
 %% Time vector
@@ -30,24 +30,41 @@ end
 %% Prealocate estimated traj
 est.pos = truth.pos;
 est.quat = truth.quat;
+est.world_vel = truth.world_vel;
 est.compute_time = zeros(1,size(imu_time_vec,2));
+est.grav_vec = [0; 0; 9.81];
+est.gyro_bias = zeros(3,size(imu_time_vec,2));
 
 %% Generate IMU measurements
 % IMU parameters
 imu_param.gyro_NoiseDensity = 0.0028; % rad/s / Hz^(1/2)
-imu_param.gyro_Bias = [-1, 2, 3] * 10^-2; % gyro constant bias term (rad)
+imu_param.gyro_Bias = [-1, 2, 3] * 10^-9; % gyro constant bias term (rad)
 imu_param.accel_NoiseDensity = 0.00016; % m/s^2 / Hz^(1/2)
-imu_param.accel_Bias = [-9, 9, 9] * 10^-2; % accel constant bias term (m/s)
-imu_param.dt = dt;
+%imu_param.accel_Bias = [-9, 9, 9] * 10^-2; % accel constant bias term (m/s)
+imu_param.accel_Bias = [0, 0, 0] * 10^-2; % accel constant bias term (m/s)
+imu_param.dt = imu_dt;
 
 % Generate IMU meas
 imu_meas = generate_imu_measurements(truth.world_accel, truth.world_rot_vel, truth.quat, imu_param);
 
 %% SLAM configuration
+% State vector consists of 
+% Non linear components: pos, quat, vel
+% Linear components: gyro_bias
+
 % Trajectory config
-filter_params.num_particle = 1;
+filter_params.num_particle = 200;
+
 % Motion covariance = [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z]
-filter_params.motion_sigma = [0.3; 0.3; 0.3; 0.01; 0.01; 0.01];
+filter_params.motion_sigma = [0.5; 0.5; 0.5; 0.02; 0.02; 0.02];
+
+% Linear noise parameters
+filter_params.cov_imu_noise = diag(filter_params.motion_sigma.^2);
+filter_params.cov_bias_noise = diag([5,5,5] * 10^-4);
+
+% Initial values for linear sub-components
+filter_params.init_gyro_bias = [0; 0; 0];
+filter_params.init_gyro_P = diag([1, 1, 1] * 10^-2);
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
@@ -69,18 +86,31 @@ filter_params.num_GM_cap = 5000;
 
 est.filter_params = filter_params;
 
+% Select which IMU to used
+est.imu_used = "imu";
+if est.imu_used == "perfect"
+    est.imu_meas = imu_meas.perfect_imu;
+elseif est.imu_used == "no_bias"
+    est.imu_meas = imu_meas.no_bias_imu;
+elseif est.imu_used == "imu"
+    est.imu_meas = imu_meas.imu;
+end
+
+
 %% Initialize SLAM particles
 cur_pos = est.pos(:,1);
 cur_quat = est.quat(1,:);
+cur_vel = est.world_vel(:,1);
 meas = truth.meas_table{1,1};
 meas_world_frame = reproject_meas(cur_pos, cur_quat, meas);
-particles = init_phd_particles (filter_params.num_particle, cur_pos, cur_quat, ...
+particles = init_phd_particles_marginalized (filter_params.num_particle, cur_pos, cur_vel, cur_quat,...
+    filter_params.init_gyro_bias, filter_params.init_gyro_P,...
     meas_world_frame, filter_params.birthGM_cov, filter_params.birthGM_intensity);
-
+img_ind = 1;
 %% Run simulation
 for i=2:size(imu_time_vec,2)
     %% Parse some truth data
-    meas = truth.meas_table{i,1};
+    meas = truth.meas_table{img_ind,1};
     meas_reprojected = reproject_meas(truth.pos(:,i), truth.quat(i,:), meas);
     
 
@@ -91,37 +121,60 @@ for i=2:size(imu_time_vec,2)
     
     %% Propagate IMU to generate odometry
     tic
+    %% Get inertial measurements
+    cur_imu_gyro = est.imu_meas.gyro(:,i);
+    cur_imu_acc = est.imu_meas.accel(:,i);
+    for par_ind = 1:size(particles,2)
+        cur_particle = particles(1,par_ind);
+        %% MPF time update. Step 3 of Alg 2.4 in Blesser's thesis 
+        %% Step 3.a Particle filter time update
+        % Generate sampled measurement for accel and gyro for propagation
+        acc_noise_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
+        sampled_acc = cur_imu_acc + acc_noise_sample;
+        
+        gyr_noise_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
+        sampled_gyr = cur_imu_gyro + gyr_noise_sample;
+        
+        % Save prev non_linear state
+        prev_non_linear_state.pos = cur_particle.pos;
+        prev_non_linear_state.vel = cur_particle.vel;
+        prev_non_linear_state.quat = cur_particle.quat;
 
-    % Fuse measurement when it is available
+        % Propagate forward in time given measurements
+        [cur_particle.pos, cur_particle.vel, cur_particle.quat,~, ~] = ...
+        propagate_imu(cur_particle.pos, cur_particle.vel, cur_particle.quat, ...
+        sampled_acc, sampled_gyr, cur_particle.gyro_bias, [0;0;0], est.grav_vec, imu_dt);
+
+        % Save predicted non_linear state
+        pred_non_linear_state.pos = cur_particle.pos;
+        pred_non_linear_state.vel = cur_particle.vel;
+        pred_non_linear_state.quat = cur_particle.quat;
+
+        %% Step 3.b Kalman filter corrective measurement update 
+        [bias_correct, P_correct] = MPF_corrective_KF_meas_update(prev_non_linear_state,...
+            pred_non_linear_state, cur_particle.gyro_bias, ...
+            cur_particle.gyro_cov, filter_params.cov_imu_noise, sampled_acc, ...
+            sampled_gyr, est.grav_vec, imu_dt);
+
+        cur_particle.gyro_bias = bias_correct;
+        cur_particle.gyro_cov = P_correct;
+
+        %% Step 3.c Kalman filter time update
+        [bias_pred, P_pred] = MPF_KF_time_update (cur_particle.gyro_bias,...
+            cur_particle.gyro_cov, filter_params.cov_bias_noise);
+        
+        cur_particle.gyro_bias = bias_pred;
+        cur_particle.gyro_cov = P_pred;
+
+        particles(1,par_ind) = cur_particle;
+    end
+    
     if truth.has_img(i) == 1
+        %% MPF measurement update
+        % Fuse camera measurement when it is available
         Parlikeli = zeros (1,filter_params.num_particle);
         for par_ind = 1:size(particles,2)
             cur_particle = particles(1,par_ind);
-            % %% Trajectory prediction
-            body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
-            body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6); 
-            
-            % % Particle odometry sample
-            body_vel_sample = odom.body_trans_vel(:,i) + body_vel_sample;
-            body_rot_vel_sample = odom.body_rot_vel(:,i) + body_rot_vel_sample;
-    
-            [cur_particle.pos, cur_particle.quat] = propagate_state (cur_particle.pos, ...
-                cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);
-    
-            % Give particle truth pose for map debug
-            cur_particle.pos = truth.pos(:,i);
-            cur_particle.quat = truth.quat(i,:);
-    
-            particles(1,par_ind).pos = cur_particle.pos;
-            particles(1,par_ind).quat = cur_particle.quat;
-        
-    
-            % figure(2)
-            % draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
-            % str_name = sprintf("All GM at %d", i);
-            % hold on
-            % draw_phd(cur_particle.gm_mu, cur_particle.gm_cov, cur_particle.gm_inten,[-30 150], truth.landmark_locations,str_name)
-             
     
             %% Check if GM is in FOV
             num_GM = size(cur_particle.gm_mu,2);
@@ -144,34 +197,18 @@ for i=2:size(imu_time_vec,2)
             GM_mu_in_prev = GM_mu_in;
             GM_cov_in_prev = GM_cov_in;
             GM_inten_in_prev = GM_inten_in;
-            
-            %
-            % figure(3)
-            % draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
-            % str_name = sprintf("GM out FOV at %d", i);
-            % hold on
-            % draw_phd(GM_mu_out, GM_cov_out, GM_inten_out,[-30 150], truth.landmark_locations,str_name)
-            % 
-            % figure(4)
-            % draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
-            % str_name = sprintf("GM in FOV at %d", i);
-            % hold on
-            % draw_phd(GM_mu_in, GM_cov_in, GM_inten_in,[-30 150], truth.landmark_locations,str_name)
-            
-    
+
             num_GM_in = size(GM_inten_in,2);
     
             %% Only  perform update steps if there are GM components in the FOV
             if num_GM_in > 0
                 % Porpagate dynamics of landmark. Landmark has no motion so mu stay
                 % constant. 
-            
                 for kk = 1:num_GM_in
                     GM_cov_in(:,:,kk) = GM_cov_in_prev(:,:,kk) + filter_params.map_Q;
                 end
     
-    
-                % Compute particle likelihood - NEED MORE RESEARCH
+                % Compute particle likelihood - single cluster 
                 likelipz = zeros (1,size(meas,2));
                 for jj = 1:size(meas,2)
                     likelipf = zeros (1,num_GM_in);
@@ -180,7 +217,7 @@ for i=2:size(imu_time_vec,2)
                         zdiff = meas(:, jj) - pred_z;
                         %%%%%
                         likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
-                            exp(-0.5*(zdiff)'*inv(filter_params.R)*zdiff ) * ...
+                            exp(-0.5*(zdiff)'*pinv(filter_params.R)*zdiff ) * ...
                             GM_inten_in_prev(kk);
                         %likelipf (1, kk) = mvnpdf(meas(:, jj), pred_z, R) * clutter_intensity;
                     end
@@ -308,7 +345,7 @@ for i=2:size(imu_time_vec,2)
             % xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
             % ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
             axis equal
-            title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
+            title_str = sprintf("Expected num of landmark = %d. t = %f", exp_num_landmark,img_time_vec(img_ind));
             title(title_str)
             %exportgraphics(fig1, "map.gif", Append=true);
     
@@ -319,9 +356,51 @@ for i=2:size(imu_time_vec,2)
             % %exportgraphics(fig2, "phd5.gif", Append=true);
             % drawnow;
          end
-         dbg_str = sprintf("timestep %f, num_landmark %d",time_vec(i),exp_num_landmark);
+         img_ind = img_ind + 1;
+         dbg_str = sprintf("timestep %f, num_landmark %d",img_time_vec(img_ind),exp_num_landmark);
          disp(dbg_str);
+    
+    else 
+        %% If no camera measurement yet
+        %% EAP for state estimation or weighted sum
+        est_pos = [0;0;0];
+        est_euler = [0;0;0]; % Uses euler to be able to perform weighted sum on orientation. Sequence ZYX
+        est_vel = [0;0;0];
+        est_bias = [0;0;0];
+        particle_likeli = zeros(1, size(particles,2)); % Use map estimate from max likeli
+        for par_ind = 1:size(particles,2)
+            est_pos = est_pos + particles(1,par_ind).w * particles(1,par_ind).pos;
+            est_vel = est_vel + particles(1,par_ind).w * particles(1,par_ind).vel;
+            est_bias = est_bias + particles(1,par_ind).w * particles(1,par_ind).gyro_bias;
+
+            cur_ind_euler = quat2eul(particles(1,par_ind).quat); %ZYX
+            est_euler = est_euler + cur_ind_euler' * particles(1,par_ind).w;
+
+            particle_likeli(1,par_ind) = particles(1,par_ind).w;
+        end
+        
+        est.pos(:,i) = est_pos;
+        est.vel(:,i) = est_vel;
+        est.bias(:,i) = est_bias;
+        temp = eul2quat(est_euler');
+        est.quat(i,:) = quaternion(temp);
+
+        %% MAP Landmark estimation
+        [max_likeli, max_w_particle_ind] = max(particle_likeli);
+        max_likeli_gm_mu = particles(1,max_w_particle_ind).gm_mu;
+        max_likeli_gm_inten = particles(1,max_w_particle_ind).gm_inten;
+        max_likeli_gm_cov = particles(1,max_w_particle_ind).gm_cov;
+        % Find expected number of landmark
+        exp_num_landmark = round(sum (max_likeli_gm_inten));
+        %ID_map = find(max_likeli_gm_inten > landmark_threshold);
+        [~,ID_map] = maxk (max_likeli_gm_inten, exp_num_landmark);
+        map_est = max_likeli_gm_mu(:,ID_map);
+        est.map_est {i,1} = map_est;
+
+        est.compute_time(1,i) = toc;
     end
+
+
 end
 simulation.est = est;
 simulation.truth = truth;

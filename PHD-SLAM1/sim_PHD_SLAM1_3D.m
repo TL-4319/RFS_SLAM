@@ -120,8 +120,8 @@ for i=2:size(time_vec,2)
             cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);
 
         % Give particle truth pose for map debug
-        cur_particle.pos = truth.pos(:,i);
-        cur_particle.quat = truth.quat(i,:);
+        %cur_particle.pos = truth.pos(:,i);
+        %cur_particle.quat = truth.quat(i,:);
 
         particles(1,par_ind).pos = cur_particle.pos;
         particles(1,par_ind).quat = cur_particle.quat;

@@ -50,7 +50,7 @@ accel_bias = zeros(3,size(imu_pos,2));
 %gyro_bias(:,1) = imu_param.gyro_Bias';
 %accel_bias(:,1) = imu_param.accel_Bias';
 
-imu_to_use = imu_meas.imu;
+imu_to_use = imu_meas.perfect_imu;
 
 for tt = 2:size(imu_time_vec,2)
     %[test_pos(:,tt),test_quat(tt)] = propagate_state(test_pos(:,tt-1), test_quat(tt-1),trans_vel(:,tt-1),rot_vel_body(:,tt-1),dt);
