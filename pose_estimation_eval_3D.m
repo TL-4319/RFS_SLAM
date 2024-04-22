@@ -6,7 +6,7 @@ addpath('util/')
 
 %% Parse data
 % Parse estimations
-load ("PHD_SLAM1/sim_data_output/20240225_sim_3D.mat");
+load ("sim-result/3d/test.mat");
 
 % Parse measurement table
 %load ("dataset/meas_table_2.mat");
@@ -146,3 +146,27 @@ grid on
 % plot ([0,0], [0,0],'g','DisplayName','Estimated trajectory')
 % legend
 
+figure()
+draw_trajectory(simulation.truth.pos(:,tt), simulation.truth.quat(tt,:), simulation.truth.pos(:,1:tt), 1, 10, 2,'k',false);
+draw_trajectory(simulation.est.pos(:,tt), simulation.est.quat(tt,:), simulation.est.pos(:,1:tt), 1, 10, 2,'g',true);
+hold on
+set(gca, 'Zdir', 'reverse')
+set(gca, 'Ydir', 'reverse')
+grid on
+%view([0,90])
+
+scatter3(simulation.truth.landmark_locations(1,:),simulation.truth.landmark_locations(2,:),simulation.truth.landmark_locations(3,:),'k')
+scatter3(simulation.est.map_est{tt,1}(1,:), simulation.est.map_est{tt,1}(2,:), simulation.est.map_est{tt,1}(3,:),'r+')
+%for j=1:size(particles,2)
+%    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
+%end
+hold off
+%draw_particle_pos(particles,1)
+xlabel("X");
+ylabel("Y");
+zlabel("Z");
+%xlim([-(map_size + 5), (map_size + 5)])
+%ylim([-(map_size + 5), (map_size + 5)])
+xlim ([min(simulation.truth.landmark_locations(1,:)), max(simulation.truth.landmark_locations(1,:))])
+ylim([min(simulation.truth.landmark_locations(2,:)), max(simulation.truth.landmark_locations(2,:))])
+axis equal

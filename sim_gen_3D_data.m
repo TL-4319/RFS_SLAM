@@ -9,20 +9,20 @@ dt = 0.2;
 draw = false;
 %% Generate landmark map
 map_size = 100;
-num_landmark = 2000;
+num_landmark = 3000;
 landmark_locations = vertcat((rand(1,num_landmark)-0.2) * 2 * map_size ,...
-    (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.5) * 2 * map_size);
+    (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.9) * 3);
 marker_size = ones(size(landmark_locations,2),1) * 10;
 
 %% Sensor/Robot
 % Sensor properties
 sensor.HFOV = deg2rad(110);
 sensor.VFOV = deg2rad(70);
-sensor.max_range = 50;
+sensor.max_range = 15;
 sensor.min_range = 0.4;
-sensor.P_d = 0.8;
+sensor.P_d = 0.9;
 sensor.clutter_rate = 2;
-sensor.sigma = 0.1;
+sensor.sigma = 0.2;
 
 % Generate trajectory
 waypoints = [0,0,0; ... % Initial position
@@ -32,7 +32,7 @@ waypoints = [0,0,0; ... % Initial position
              120,120,0];    % Final position
 
 orientation_wp = quaternion([0,0,0; ...
-                          30,10,0;...
+                          30,0,0;...
                           90,0,0;...
                           70,0,0;...
                           50,0,0],...
@@ -40,7 +40,7 @@ orientation_wp = quaternion([0,0,0; ...
 
 groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero velocity
 
-[pos, quat, trans_vel, acc_body, rot_vel, time_vec] = generate_trajectory(waypoints,...
+[pos, quat, trans_vel, acc_body, acc_world, rot_vel, rot_vel_world, time_vec] = generate_trajectory2(waypoints,...
     orientation_wp, groundspeed, dt);
 
 
@@ -62,7 +62,7 @@ if draw
     fig1 = figure(1);
     title ("Sim world")
     fig1.Position=[0,0, 1000, 1000];
-    
+    zlim([-4 1])
     % fig2 = figure(2);
     % title("Sensor frame")
     % movegui (fig2, [570,0])
@@ -154,6 +154,7 @@ for i=2:size(time_vec,2)
         %ylim([-(map_size + 5), (map_size + 5)])
         axis equal
         indx_name = pad(sprintf('%d',i), 3, 'left','0');
+        zlim([-4 1])
     
         % figure(2)
         % scatter3(meas(1,:), meas(2,:), meas(3,:), 'b*')

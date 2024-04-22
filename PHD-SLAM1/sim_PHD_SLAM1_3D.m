@@ -4,13 +4,13 @@ clear;
 clc;
 
 %% 
-rng(420);
-draw = false;
+rng(307);
+draw = true;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_3D_1.mat');
+load('../dataset/truth_3D_2.mat');
 %load('../dataset/meas_table_2.mat');
 %truth_hist = truth.pos(:,1);
 %truth.meas_table = meas_table;
@@ -27,11 +27,11 @@ dt = time_vec(2) - time_vec(1);
 if draw
     fig1 = figure(1);
     title ("Sim world")
-    fig1.Position = [1,1,800,800];
+    fig1.Position = [1,1,2000,2000];
     
-    fig2 = figure(2);
-    title("Sensor frame")
-    fig2.Position = [611,1,600,600];
+    % fig2 = figure(2);
+    % title("Sensor frame")
+    % fig2.Position = [611,1,600,600];
 end
 
 
@@ -41,8 +41,8 @@ est.quat = truth.quat;
 est.compute_time = zeros(1,size(time_vec,2));
 
 %% Odometry parameters
-odom.sigma_trans = [0.3; 0.3; 0.3];
-odom.sigma_rot = [0.2; 0.2; 0.2];
+odom.sigma_trans = [0.01; 0.01; 0.01];
+odom.sigma_rot = [0.03; 0.03; 0.03];
 odom.body_trans_vel = truth.body_trans_vel + ...
     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
 odom.body_rot_vel = truth.body_rot_vel + ...
@@ -50,29 +50,30 @@ odom.body_rot_vel = truth.body_rot_vel + ...
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 1;
+filter_params.num_particle = 1000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
-filter_params.motion_sigma = [0.3; 0.3; 0.3; 0.3; 0.3; 0.3];
+filter_params.motion_sigma = [0.01; 0.01; 0.01; 0.03; 0.03; 0.03];
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;
 filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.2];
 
 % Sensor model
-filter_params.map_Q = diag([0.2, 0.2, 0.2]);
+filter_params.map_Q = diag([0.1, 0.1, 0.1]);
 filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
-filter_params.clutter_intensity = 50 / (20^2 * 0.3 * pi);
-filter_params.P_d = 0.9;
+filter_params.clutter_intensity = 3 / (50^2 * 0.3 * pi);
+filter_params.P_d = 0.8;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 4;
-filter_params.num_GM_cap = 3000;
+filter_params.merge_dist = 0.3;
+filter_params.num_GM_cap = 5000;
 
 est.filter_params = filter_params;
+est.num_effective_part = zeros (1,size(time_vec,2));
 
 %% Initialize SLAM particles
 cur_pos = est.pos(:,1);
@@ -120,8 +121,8 @@ for i=2:size(time_vec,2)
             cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);
 
         % Give particle truth pose for map debug
-        cur_particle.pos = truth.pos(:,i);
-        cur_particle.quat = truth.quat(i,:);
+        %cur_particle.pos = truth.pos(:,i);
+        %cur_particle.quat = truth.quat(i,:);
 
         particles(1,par_ind).pos = cur_particle.pos;
         particles(1,par_ind).quat = cur_particle.quat;
@@ -182,32 +183,36 @@ for i=2:size(time_vec,2)
             end
 
 
-            % Compute particle likelihood - NEED MORE RESEARCH
+            %% Pre compute inner update terms
+            [pred_z, K, S, P, Sinv] = compute_update_terms (cur_particle,...
+                GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
+
+            %% Compute particle likelihood - single cluster
             likelipz = zeros (1,size(meas,2));
             for jj = 1:size(meas,2)
                 likelipf = zeros (1,num_GM_in);
                 for kk = 1:num_GM_in
-                    pred_z = gen_pred_meas(cur_particle.pos, cur_particle.quat, GM_mu_in_prev(:,kk));
-                    zdiff = meas(:, jj) - pred_z;
+                    %pred_z_temp = gen_pred_meas(cur_particle.pos, cur_particle.quat, GM_mu_in_prev(:,kk));
+                    zdiff = meas(:, jj) - pred_z(:,kk);
                     %%%%%
-                    likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
-                        exp(-0.5*(zdiff)'*inv(filter_params.R)*zdiff ) * ...
+                    % likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
+                    %     exp(-0.5*(zdiff)'*pinv(filter_params.R)*zdiff ) * ...
+                    %     GM_inten_in_prev(kk);
+                    likelipf (1,kk) = 1 / sqrt(det(S(:,:,kk)) * (2*pi) ^size(filter_params.R,1))*...
+                        exp(-0.5*(zdiff)' * Sinv(:,:,kk) * zdiff ) * ...
                         GM_inten_in_prev(kk);
                     %likelipf (1, kk) = mvnpdf(meas(:, jj), pred_z, R) * clutter_intensity;
                 end
-                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf,2);
+                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf,2) * filter_params.P_d;
             end
-            Parlikeli(1,par_ind) = prod(likelipz,2) + 1e-99;
+            %Parlikeli(1,par_ind) = (prod(likelipz,2) + 1e-99) *
+            %cur_particle.w;  From Lin Gao code
+            Parlikeli(1,par_ind) = exp(sum(GM_inten_in_prev,2)) * (prod(likelipz,2) + 1e-99) * cur_particle.w;
 
-
-            % Pre compute inner update terms
-            [pred_z, K, S, P] = compute_update_terms (cur_particle,...
-                GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
-
-            % Update missed detection terms
+            %% Update missed detection terms
             GM_inten_in = (1 - filter_params.P_d) * GM_inten_in_prev;
 
-            %Update PHD component of detected 
+            %% Update PHD component of detected 
             l = 0;
             for zz = 1:size(meas,2)
                 l = l + 1;
@@ -282,14 +287,19 @@ for i=2:size(time_vec,2)
 
     %% Resample particles (from Lin Gao)
     wei_ud = Parlikeli / sum(Parlikeli,2);
-    resample_ind = particle_resample(wei_ud, filter_params.num_particle);
-    for par_ind = 1:filter_params.num_particle
-        particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
-        particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
-        particles(1,par_ind).w = particles(1,resample_ind(1,par_ind)).w;
-        particles(1,par_ind).gm_mu = particles(1,resample_ind(1,par_ind)).gm_mu;
-        particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
-        particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
+    est.num_effective_part(:,i) = 1/ sum(wei_ud.^2,2);
+    if est.num_effective_part(:,i) < 0.2 * filter_params.num_particle
+        dbg_str = sprintf('Num of effective particle is %d . Resample triggered', est.num_effective_part(:,i));
+        disp (dbg_str)
+        resample_ind = particle_resample(wei_ud, filter_params.num_particle);
+        for par_ind = 1:filter_params.num_particle
+            particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
+            particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
+            particles(1,par_ind).w = particles(1,resample_ind(1,par_ind)).w;
+            particles(1,par_ind).gm_mu = particles(1,resample_ind(1,par_ind)).gm_mu;
+            particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
+            particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
+        end
     end
     est.compute_time(1,i) = toc;
     %% Plotting
@@ -306,9 +316,9 @@ for i=2:size(time_vec,2)
         scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),marker_size,'k')
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
-        %for j=1:size(particles,2)
-        %    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
-        %end
+        for j=1:size(particles,2)
+            scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
+        end
         hold off
         %draw_particle_pos(particles,1)
         xlabel("X");
@@ -316,23 +326,53 @@ for i=2:size(time_vec,2)
         zlabel("Z");
         %xlim([-(map_size + 5), (map_size + 5)])
         %ylim([-(map_size + 5), (map_size + 5)])
+        zlim([-4 1])
         % xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
         % ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
         axis equal
         title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
         title(title_str)
-        %exportgraphics(fig1, "map.gif", Append=true);
+        exportgraphics(fig1, "map.gif", Append=true);
 
         % figure(2)
         % draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
         % hold on
         % draw_phd(max_likeli_gm_mu, max_likeli_gm_cov, max_likeli_gm_inten,[-30 150], truth.landmark_locations,"Test")
         % %exportgraphics(fig2, "phd5.gif", Append=true);
-        % drawnow;
+         drawnow;
      end
      dbg_str = sprintf("timestep %f, num_landmark %d",time_vec(i),exp_num_landmark);
      disp(dbg_str);
 end
+
+%% DRAW LAST FRAME
+figure(1)
+draw_trajectory(truth.pos(:,i), truth.quat(i,:), truth.pos(:,1:i), 1, 10, 2,'k',false);
+draw_trajectory(est.pos(:,i), est.quat(i,:), est.pos(:,1:i), 1, 10, 2,'g',true);
+hold on
+set(gca, 'Zdir', 'reverse')
+set(gca, 'Ydir', 'reverse')
+grid on
+scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),marker_size,'k')
+scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
+scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
+%for j=1:size(particles,2)
+%    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
+%end
+hold off
+%draw_particle_pos(particles,1)
+xlabel("X");
+ylabel("Y");
+zlabel("Z");
+%xlim([-(map_size + 5), (map_size + 5)])
+%ylim([-(map_size + 5), (map_size + 5)])
+% xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
+% ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
+axis equal
+title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
+title(title_str)
+
+%%
 simulation.est = est;
 simulation.truth = truth;
 simulation.odom = odom;
