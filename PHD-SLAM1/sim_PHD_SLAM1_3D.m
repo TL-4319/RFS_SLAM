@@ -5,7 +5,7 @@ clc;
 
 %% 
 rng(307);
-draw = true;
+draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
@@ -50,7 +50,7 @@ odom.body_rot_vel = truth.body_rot_vel + ...
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 1000;
+filter_params.num_particle = 10000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 filter_params.motion_sigma = [0.01; 0.01; 0.01; 0.03; 0.03; 0.03];
 
