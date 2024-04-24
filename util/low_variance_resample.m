@@ -7,6 +7,10 @@ function resample_id = low_variance_resample (w, L)
         u = r + (m - 1) / L;
         while u > c
             i = i+1;
+            if i> L
+                i = L;
+                break;
+            end
             c = c + w(i);
         end
         resample_id(m) = i;

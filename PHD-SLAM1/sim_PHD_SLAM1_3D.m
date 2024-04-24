@@ -5,7 +5,7 @@ clc;
 
 %% 
 rng(307);
-draw = true;
+draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
@@ -41,7 +41,7 @@ est.quat = truth.quat;
 est.compute_time = zeros(1,size(time_vec,2));
 
 %% Odometry parameters
-odom.sigma_trans = [0.01; 0.01; 0.01];
+odom.sigma_trans = [0.1; 0.1; 0.1];
 odom.sigma_rot = [0.03; 0.03; 0.03];
 odom.body_trans_vel = truth.body_trans_vel + ...
     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
@@ -50,16 +50,16 @@ odom.body_rot_vel = truth.body_rot_vel + ...
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 1000;
+filter_params.num_particle = 5000;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
-filter_params.motion_sigma = [0.01; 0.01; 0.01; 0.03; 0.03; 0.03];
+filter_params.motion_sigma = [0.1; 0.1; 0.1; 0.03; 0.03; 0.03];
 
 % Map PHD config
-filter_params.birthGM_intensity = 0.1;
-filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.2];
+filter_params.birthGM_intensity = 0.01;
+filter_params.birthGM_cov = [0.02, 0, 0; 0, 0.02, 0; 0, 0, 0.02].^2;
 
 % Sensor model
-filter_params.map_Q = diag([0.1, 0.1, 0.1]);
+filter_params.map_Q = diag([0.01, 0.01, 0.01].^2);
 filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
@@ -291,7 +291,8 @@ for i=2:size(time_vec,2)
     if est.num_effective_part(:,i) < 0.2 * filter_params.num_particle
         dbg_str = sprintf('Num of effective particle is %d . Resample triggered', est.num_effective_part(:,i));
         disp (dbg_str)
-        resample_ind = particle_resample(wei_ud, filter_params.num_particle);
+        %resample_ind = particle_resample(wei_ud, filter_params.num_particle);
+        resample_ind = low_variance_resample(wei_ud, filter_params.num_particle);
         for par_ind = 1:filter_params.num_particle
             particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
             particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
@@ -332,7 +333,7 @@ for i=2:size(time_vec,2)
         axis equal
         title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
         title(title_str)
-        exportgraphics(fig1, "map.gif", Append=true);
+        %exportgraphics(fig1, "map.gif", Append=true);
 
         % figure(2)
         % draw_trajectory(truth.pos(:,i), truth.quat(i,:), [0;0;0], 1, 10, 2,'k',false);
