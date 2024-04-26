@@ -37,11 +37,11 @@ est.gyro_bias = zeros(3,size(imu_time_vec,2));
 
 %% Generate IMU measurements
 % IMU parameters
-imu_param.gyro_NoiseDensity = 0.0028; % rad/s / Hz^(1/2)
-imu_param.gyro_Bias = [-1, 2, 3] * 10^-9; % gyro constant bias term (rad)
-imu_param.accel_NoiseDensity = 0.00016; % m/s^2 / Hz^(1/2)
-%imu_param.accel_Bias = [-9, 9, 9] * 10^-2; % accel constant bias term (m/s)
-imu_param.accel_Bias = [0, 0, 0] * 10^-2; % accel constant bias term (m/s)
+imu_param.gyro_NoiseDensity = 0.00028; % rad/s / Hz^(1/2)
+imu_param.gyro_Bias = [-1, 2, 3] * 10^-2; % gyro constant bias term (rad)
+imu_param.accel_NoiseDensity = 0.00018; % m/s^2 / Hz^(1/2)
+imu_param.accel_Bias = [-5, 5, 3] * 10^-2; % accel constant bias term (m/s)
+%imu_param.accel_Bias = [0, 0, 0] * 10^-2; % accel constant bias term (m/s)
 imu_param.dt = imu_dt;
 
 % Generate IMU meas
@@ -53,10 +53,10 @@ imu_meas = generate_imu_measurements(truth.world_accel, truth.world_rot_vel, tru
 % Linear components: gyro_bias
 
 % Trajectory config
-filter_params.num_particle = 200;
+filter_params.num_particle = 500;
 
 % Motion covariance = [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z]
-filter_params.motion_sigma = [0.5; 0.5; 0.5; 0.02; 0.02; 0.02];
+filter_params.motion_sigma = [2; 2; 2; 0.02; 0.02; 0.02];
 
 % Linear noise parameters
 filter_params.cov_imu_noise = diag(filter_params.motion_sigma.^2);
@@ -67,16 +67,16 @@ filter_params.init_gyro_bias = [0; 0; 0];
 filter_params.init_gyro_P = diag([1, 1, 1] * 10^-2);
 
 % Map PHD config
-filter_params.birthGM_intensity = 0.1;
-filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.2];
+filter_params.birthGM_intensity = 0.01;
+filter_params.birthGM_cov = [0.02, 0, 0; 0, 0.02, 0; 0, 0, 0.02].^2;
 
 % Sensor model
-filter_params.map_Q = diag([0.1, 0.1, 0.1]);
+filter_params.map_Q = diag([0.01, 0.01, 0.01].^2);
 filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
-filter_params.clutter_intensity = 3 / (20^2 * 0.3 * pi);
+filter_params.clutter_intensity = 2 / (15^2 * 0.3 * pi);
 filter_params.P_d = 0.8;
 
 % PHD management parameters
@@ -85,6 +85,7 @@ filter_params.merge_dist = 0.3;
 filter_params.num_GM_cap = 5000;
 
 est.filter_params = filter_params;
+est.num_effective_part = zeros (1,size(imu_time_vec,2));
 
 % Select which IMU to used
 est.imu_used = "imu";
@@ -129,10 +130,10 @@ for i=2:size(imu_time_vec,2)
         %% MPF time update. Step 3 of Alg 2.4 in Blesser's thesis 
         %% Step 3.a Particle filter time update
         % Generate sampled measurement for accel and gyro for propagation
-        acc_noise_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
+        acc_noise_sample = normrnd(0,1,3,1) .* filter_params.motion_sigma(1:3);
         sampled_acc = cur_imu_acc + acc_noise_sample;
         
-        gyr_noise_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
+        gyr_noise_sample = normrnd(0,1,3,1) .* filter_params.motion_sigma(4:6);
         sampled_gyr = cur_imu_gyro + gyr_noise_sample;
         
         % Save prev non_linear state
@@ -207,28 +208,26 @@ for i=2:size(imu_time_vec,2)
                 for kk = 1:num_GM_in
                     GM_cov_in(:,:,kk) = GM_cov_in_prev(:,:,kk) + filter_params.map_Q;
                 end
-    
+                
+                % Pre compute inner update terms
+                [pred_z, K, S, P, Sinv] = compute_update_terms (cur_particle,...
+                    GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
+
                 % Compute particle likelihood - single cluster 
                 likelipz = zeros (1,size(meas,2));
                 for jj = 1:size(meas,2)
                     likelipf = zeros (1,num_GM_in);
                     for kk = 1:num_GM_in
-                        pred_z = gen_pred_meas(cur_particle.pos, cur_particle.quat, GM_mu_in_prev(:,kk));
-                        zdiff = meas(:, jj) - pred_z;
+                        zdiff = meas(:, jj) - pred_z(:,kk);
                         %%%%%
-                        likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
-                            exp(-0.5*(zdiff)'*pinv(filter_params.R)*zdiff ) * ...
-                            GM_inten_in_prev(kk);
-                        %likelipf (1, kk) = mvnpdf(meas(:, jj), pred_z, R) * clutter_intensity;
+                        likelipf (1,kk) = 1 / sqrt(det(S(:,:,kk)) * (2*pi) ^size(filter_params.R,1))*...
+                        exp(-0.5*(zdiff)' * Sinv(:,:,kk) * zdiff ) * ...
+                        GM_inten_in_prev(kk);
                     end
-                    likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf,2);
+                    likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf * filter_params.P_d,2);
                 end
-                Parlikeli(1,par_ind) = prod(likelipz,2) + 1e-99;
+                 Parlikeli(1,par_ind) = exp(sum(GM_inten_in_prev,2)) * (prod(likelipz,2) + 1e-99) * cur_particle.w;
     
-    
-                % Pre compute inner update terms
-                [pred_z, K, S, P] = compute_update_terms (cur_particle,...
-                    GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
     
                 % Update missed detection terms
                 GM_inten_in = (1 - filter_params.P_d) * GM_inten_in_prev;
@@ -275,6 +274,7 @@ for i=2:size(imu_time_vec,2)
         % MAP trajectory estimation
         est.pos(:,i) = particles(1,max_w_particle_ind).pos;
         est.quat(i,:) = particles(1,max_w_particle_ind).quat;
+        est.bias(:,i) = particles(1,max_w_particle_ind).gyro_bias;
         
         % MAP Landmark estimation
         max_likeli_gm_mu = particles(1,max_w_particle_ind).gm_mu;
@@ -306,16 +306,21 @@ for i=2:size(imu_time_vec,2)
             particles(1,par_ind).gm_mu = horzcat(particles(1,par_ind).gm_mu, new_birth_mu);
         end
     
-        %% Resample particles (from Lin Gao)
+        %% Resample particles
         wei_ud = Parlikeli / sum(Parlikeli,2);
-        resample_ind = particle_resample(wei_ud, filter_params.num_particle);
-        for par_ind = 1:filter_params.num_particle
-            particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
-            particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
-            particles(1,par_ind).w = particles(1,resample_ind(1,par_ind)).w;
-            particles(1,par_ind).gm_mu = particles(1,resample_ind(1,par_ind)).gm_mu;
-            particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
-            particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
+        est.num_effective_part(:,i) = 1/ sum(wei_ud.^2,2);
+        if est.num_effective_part(:,i) < 0.2 * filter_params.num_particle
+            dbg_str = sprintf('Num of effective particle is %d . Resample triggered', est.num_effective_part(:,i));
+            disp(dbg_str);
+            resample_ind = low_variance_resample(wei_ud, filter_params.num_particle);
+            for par_ind = 1:filter_params.num_particle
+                particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
+                particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
+                particles(1,par_ind).w = particles(1,resample_ind(1,par_ind)).w;
+                particles(1,par_ind).gm_mu = particles(1,resample_ind(1,par_ind)).gm_mu;
+                particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
+                particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
+            end
         end
         est.compute_time(1,i) = toc;
         %% Plotting
