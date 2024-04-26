@@ -4,7 +4,7 @@ clear;
 clc;
 
 %% 
-rng(307);
+rng(790);
 draw = false;
 
 %% Load truth and measurement data
@@ -43,10 +43,12 @@ est.compute_time = zeros(1,size(time_vec,2));
 %% Odometry parameters
 odom.sigma_trans = [0.1; 0.1; 0.1];
 odom.sigma_rot = [0.03; 0.03; 0.03];
-odom.body_trans_vel = truth.body_trans_vel + ...
-    randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
-odom.body_rot_vel = truth.body_rot_vel + ...
-    randn(3,size(truth.body_rot_vel,2)) .* repmat(odom.sigma_rot,1,size(truth.body_rot_vel,2));
+% odom.body_trans_vel = truth.body_trans_vel + ...
+%     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
+% odom.body_rot_vel = truth.body_rot_vel + ...
+%     randn(3,size(truth.body_rot_vel,2)) .* repmat(odom.sigma_rot,1,size(truth.body_rot_vel,2));
+odom.body_trans_vel = truth.body_trans_vel + normrnd(0,odom.sigma_trans(1),3,size(truth.body_trans_vel,2));
+odom.body_rot_vel = truth.body_rot_vel + normrnd(0,odom.sigma_rot(1),3,size(truth.body_rot_vel,2));
 
 %% SLAM configuration
 % Trajectory config
@@ -64,7 +66,7 @@ filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
-filter_params.clutter_intensity = 3 / (50^2 * 0.3 * pi);
+filter_params.clutter_intensity = 2 / (15^2 * 0.3 * pi);
 filter_params.P_d = 0.8;
 
 % PHD management parameters
@@ -106,8 +108,10 @@ for i=2:size(time_vec,2)
     for par_ind = 1:size(particles,2)
         cur_particle = particles(1,par_ind);
         % %% Trajectory prediction
-        body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
-        body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
+        % body_vel_sample = randn(3,1) .* filter_params.motion_sigma(1:3);
+        % body_rot_vel_sample = randn(3,1) .* filter_params.motion_sigma(4:6);
+        body_vel_sample = normrnd(0,filter_params.motion_sigma(1),3,1);
+        body_rot_vel_sample = normrnd(0,filter_params.motion_sigma(4),3,1);
         % 
         % % Constraint vel to 2D
         % body_vel_sample(2:3,:) = 0;
@@ -203,7 +207,7 @@ for i=2:size(time_vec,2)
                         GM_inten_in_prev(kk);
                     %likelipf (1, kk) = mvnpdf(meas(:, jj), pred_z, R) * clutter_intensity;
                 end
-                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf,2) * filter_params.P_d;
+                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf* filter_params.P_d,2) ;
             end
             %Parlikeli(1,par_ind) = (prod(likelipz,2) + 1e-99) *
             %cur_particle.w;  From Lin Gao code

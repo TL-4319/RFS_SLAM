@@ -4,7 +4,7 @@ clear;
 clc;
 
 %%
-rng(790);
+rng(307);
 draw = false;
 
 %% Load truth and measurement data
@@ -21,7 +21,7 @@ dt = time_vec(2) - time_vec(1);
 if draw
     fig1 = figure(1);
     title ("Sim world")
-    fig1.Position = [1,1,800,800];
+    fig1.Position = [1,1,2000,2000];
     
     % fig2 = figure(2);
     % title("Sensor frame")
@@ -35,27 +35,28 @@ est.compute_time = zeros (1,size(time_vec,2));
 est.num_effective_part = est.compute_time;
 
 %% Odometry configuration
-%% Odometry parameters
-odom.sigma_trans = [0.01; 0.01; 0.01];
+odom.sigma_trans = [0.1; 0.1; 0.1];
 odom.sigma_rot = [0.03; 0.03; 0.03];
-odom.body_trans_vel = truth.body_trans_vel + ...
-    randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
-odom.body_rot_vel = truth.body_rot_vel + ...
-    randn(3,size(truth.body_rot_vel,2)) .* repmat(odom.sigma_rot,1,size(truth.body_rot_vel,2));
+% odom.body_trans_vel = truth.body_trans_vel + ...
+%     randn(3,size(truth.body_trans_vel,2)) .* repmat(odom.sigma_trans,1,size(truth.body_trans_vel,2));
+% odom.body_rot_vel = truth.body_rot_vel + ...
+%     randn(3,size(truth.body_rot_vel,2)) .* repmat(odom.sigma_rot,1,size(truth.body_rot_vel,2));
+odom.body_trans_vel = truth.body_trans_vel + normrnd(0,odom.sigma_trans(1),3,size(truth.body_trans_vel,2));
+odom.body_rot_vel = truth.body_rot_vel + normrnd(0,odom.sigma_rot(1),3,size(truth.body_rot_vel,2));
 
 %% SLAM configuration
-filter_params.resample_scheme = 1; % 0 is no resampling, 1 is resample at every step, 2 is adaptive resample
-filter_params.resample_trigger = 0;
-filter_params.num_particle = 1000;
-filter_params.intial_particle_cov = diag([0.01, 0.01, 0.01, 0.01, 0.01, 0.01, 0.01]).^2;
-filter_params.process_noise = diag([0.01 0.01 0.01 0.03 0.03 0.03]).^2;
+filter_params.resample_scheme = 2; % 0 is no resampling, 1 is resample at every step, 2 is adaptive resample
+filter_params.num_particle = 500;
+filter_params.resample_trigger = filter_params.num_particle * 0.2;
+filter_params.intial_particle_cov = diag([0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 0.01]).^2;
+filter_params.process_noise = diag([0.1 0.1 0.1 0.03 0.03 0.03]).^2;
 
 % Map PHD config
-filter_params.birthGM_intensity = 0.1;
-filter_params.birthGM_cov = [0.2, 0, 0; 0, 0.2, 0; 0, 0, 0.2];
+filter_params.birthGM_intensity = 0.01;
+filter_params.birthGM_cov = [0.02, 0, 0; 0, 0.02, 0; 0, 0, 0.02];
 
 % Sensor model
-filter_params.map_Q = diag([0.1, 0.1, 0.1]);
+filter_params.map_Q = diag([0.01, 0.01, 0.01].^2);
 filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
@@ -218,7 +219,7 @@ for i = 2:size(time_vec,2)
                 Markss = 1;
                 while (Markss)
                     cur_particle.P = Pup;
-                    temp_traj = trajest + chol(Pup) * randn(7,1);
+                    temp_traj = trajest + chol(Pup) * normrnd(0,1,7,1);
                     cur_particle.pos = temp_traj(1:3,1);
                     cur_particle.quat = quaternion(temp_traj(4,1),...
                         temp_traj(5,1), temp_traj(6,1), temp_traj(7,1));
@@ -253,25 +254,26 @@ for i = 2:size(time_vec,2)
             end
 
             %% Compute particle using single cluster likelihood
+            %% Pre compute inner update terms
+            [pred_z, K, S, P, Sinv] = compute_update_terms (cur_particle,...
+                GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
+            
             % Assign likelihood based on best association
-            likelipz = zeros(1,size(meas,2));
+            likelipz = zeros (1,size(meas,2));
             for jj = 1:size(meas,2)
-                likelipf = zeros(1,num_GM);
+                likelipf = zeros (1,num_GM);
                 for kk = 1:num_GM
-                    pred_z = gen_pred_meas(cur_particle.pos, cur_particle.quat, GM_mu_in_prev(:,kk));
-                    zdiff = meas(:,jj) - pred_z;
-                    likelipf (1,kk) = 1/sqrt(det(2*pi*filter_params.R))*...
-                        exp(-0.5*(zdiff)'*pinv(filter_params.R)*zdiff ) * ...
+                    zdiff = meas(:, jj) - pred_z(:,kk);                
+                    likelipf (1,kk) = 1 / sqrt(det(S(:,:,kk)) * (2*pi) ^size(filter_params.R,1))*...
+                        exp(-0.5*(zdiff)' * Sinv(:,:,kk) * zdiff ) * ...
                         GM_inten_in_prev(kk);
                 end
-                likelipz(1,jj) = filter_params.clutter_intensity + sum(likelipf,2);
+                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf* filter_params.P_d,2) ;
             end
-            Parlikeli(1,par_ind) = prod(likelipz,2) * 1 + 1e-99;
+            
+            Parlikeli(1,par_ind) = exp(sum(GM_inten_in_prev,2)) * (prod(likelipz,2) + 1e-99) * cur_particle.w;
             %% Map update. Follow GM-PHD process
-            %% Pre compute inner update terms
-            [pred_z, K, S, P] = compute_update_terms (cur_particle,...
-                GM_mu_in_prev, GM_cov_in_prev, filter_params.R);
-
+            
             % Update missed detection terms
             GM_inten_in = (1 - filter_params.P_d) * GM_inten_in_prev;
             
@@ -359,7 +361,7 @@ for i = 2:size(time_vec,2)
     %% Resample particles (from Lin Gao)
     if filter_params.resample_scheme == 1
         wei_ud = Parlikeli / sum(Parlikeli,2);
-        resample_ind = particle_resample(wei_ud, filter_params.num_particle);
+        resample_ind = low_variance_resample(wei_ud, filter_params.num_particle);
         for par_ind = 1:filter_params.num_particle
             particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
             particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
@@ -370,7 +372,8 @@ for i = 2:size(time_vec,2)
         end
     elseif filter_params.resample_scheme == 2 && est.num_effective_part(1,i) < filter_params.resample_trigger
         wei_ud = Parlikeli / sum(Parlikeli,2);
-        resample_ind = particle_resample(wei_ud, filter_params.num_particle);
+        resample_ind = low_variance_resample(wei_ud, filter_params.num_particle);
+        disp ("Resample triggered")
         for par_ind = 1:filter_params.num_particle
             particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
             particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
@@ -414,7 +417,7 @@ for i = 2:size(time_vec,2)
         %ylim([-(map_size + 5), (map_size + 5)])
         xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
         ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
-        axis square
+        axis equal
         title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
         title(title_str)
         % exportgraphics(fig1, "map.gif", Append=true);
@@ -454,7 +457,7 @@ zlabel("Z");
 %ylim([-(map_size + 5), (map_size + 5)])
 xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
 ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
-axis square
+axis equal
 title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
 title(title_str)
 
