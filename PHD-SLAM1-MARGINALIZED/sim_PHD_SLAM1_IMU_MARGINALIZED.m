@@ -8,9 +8,9 @@ rng(307);
 draw = true;
 
 %% Load truth and measurement data
-addpath ('../util/')
+addpath ('..\util\')
 
-load('../dataset/truth_3D_imu_0_100hz.mat');
+load('..\dataset\truth_3D_imu_0_100hz.mat');
 marker_size = ones(size(truth.landmark_locations,2),1) * 10;
 
 %% Time vector
@@ -40,8 +40,8 @@ est.gyro_bias = zeros(3,size(imu_time_vec,2));
 imu_param.gyro_NoiseDensity = 0.00028; % rad/s / Hz^(1/2)
 imu_param.gyro_Bias = [-1, 2, 3] * 10^-2; % gyro constant bias term (rad)
 imu_param.accel_NoiseDensity = 0.00018; % m/s^2 / Hz^(1/2)
-imu_param.accel_Bias = [-5, 5, 3] * 10^-2; % accel constant bias term (m/s)
-%imu_param.accel_Bias = [0, 0, 0] * 10^-2; % accel constant bias term (m/s)
+%imu_param.accel_Bias = [-5, 5, 3] * 10^-2; % accel constant bias term (m/s)
+imu_param.accel_Bias = [0, 0, 0] * 10^-2; % accel constant bias term (m/s)
 imu_param.dt = imu_dt;
 
 % Generate IMU meas
@@ -53,10 +53,10 @@ imu_meas = generate_imu_measurements(truth.world_accel, truth.world_rot_vel, tru
 % Linear components: gyro_bias
 
 % Trajectory config
-filter_params.num_particle = 500;
+filter_params.num_particle = 200;
 
 % Motion covariance = [acc_x, acc_y, acc_z, gyr_x, gyr_y, gyr_z]
-filter_params.motion_sigma = [2; 2; 2; 0.02; 0.02; 0.02];
+filter_params.motion_sigma = [0.5; 0.5; 0.5; 0.02; 0.02; 0.02];
 
 % Linear noise parameters
 filter_params.cov_imu_noise = diag(filter_params.motion_sigma.^2);
@@ -77,7 +77,7 @@ filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
 filter_params.clutter_intensity = 2 / (15^2 * 0.3 * pi);
-filter_params.P_d = 0.8;
+filter_params.P_d = 0.7;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
@@ -88,7 +88,7 @@ est.filter_params = filter_params;
 est.num_effective_part = zeros (1,size(imu_time_vec,2));
 
 % Select which IMU to used
-est.imu_used = "imu";
+est.imu_used = "perfect";
 if est.imu_used == "perfect"
     est.imu_meas = imu_meas.perfect_imu;
 elseif est.imu_used == "no_bias"
@@ -271,11 +271,33 @@ for i=2:size(imu_time_vec,2)
         % Trajectory estimation
         [max_likeli, max_w_particle_ind] = max(Parlikeli);
     
-        % MAP trajectory estimation
-        est.pos(:,i) = particles(1,max_w_particle_ind).pos;
-        est.quat(i,:) = particles(1,max_w_particle_ind).quat;
-        est.bias(:,i) = particles(1,max_w_particle_ind).gyro_bias;
+        % % MAP trajectory estimation
+        % est.pos(:,i) = particles(1,max_w_particle_ind).pos;
+        % est.quat(i,:) = particles(1,max_w_particle_ind).quat;
+        % est.bias(:,i) = particles(1,max_w_particle_ind).gyro_bias;
+        %% EAP trajectory estimate
+        est_pos = [0;0;0];
+        est_euler = [0;0;0]; % Uses euler to be able to perform weighted sum on orientation. Sequence ZYX
+        est_vel = [0;0;0];
+        est_bias = [0;0;0];
+
+        for par_ind = 1:size(particles,2)
+            est_pos = est_pos + particles(1,par_ind).w * particles(1,par_ind).pos;
+            est_vel = est_vel + particles(1,par_ind).w * particles(1,par_ind).vel;
+            est_bias = est_bias + particles(1,par_ind).w * particles(1,par_ind).gyro_bias;
+
+            cur_ind_euler = quat2eul(particles(1,par_ind).quat); %ZYX
+            est_euler = est_euler + cur_ind_euler' * particles(1,par_ind).w;
+
+            particle_likeli(1,par_ind) = particles(1,par_ind).w;
+        end
         
+        est.pos(:,i) = est_pos;
+        est.vel(:,i) = est_vel;
+        est.bias(:,i) = est_bias;
+        temp = eul2quat(est_euler');
+        est.quat(i,:) = quaternion(temp);
+
         % MAP Landmark estimation
         max_likeli_gm_mu = particles(1,max_w_particle_ind).gm_mu;
         max_likeli_gm_inten = particles(1,max_w_particle_ind).gm_inten;
@@ -320,6 +342,8 @@ for i=2:size(imu_time_vec,2)
                 particles(1,par_ind).gm_mu = particles(1,resample_ind(1,par_ind)).gm_mu;
                 particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
                 particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
+                particles(1,par_ind).gyro_bias = particles(1,resample_ind(1,par_ind)).gyro_bias;
+                particles(1,par_ind).gyro_cov = particles(1,resample_ind(1,par_ind)).gyro_cov;
             end
         end
         est.compute_time(1,i) = toc;
