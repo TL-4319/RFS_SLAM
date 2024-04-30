@@ -4,13 +4,13 @@ clear;
 clc;
 
 %%
-rng(307);
+rng(790);
 draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_3D_2.mat');
+load('../dataset/truth_3D_15hz_with_pitch.mat');
 marker_size = ones(size(truth.landmark_locations,2),1) * 10;
 
 %% Time vector 
@@ -46,14 +46,14 @@ odom.body_rot_vel = truth.body_rot_vel + normrnd(0,odom.sigma_rot(1),3,size(trut
 
 %% SLAM configuration
 filter_params.resample_scheme = 2; % 0 is no resampling, 1 is resample at every step, 2 is adaptive resample
-filter_params.num_particle = 500;
+filter_params.num_particle = 100;
 filter_params.resample_trigger = filter_params.num_particle * 0.2;
 filter_params.intial_particle_cov = diag([0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 0.01]).^2;
 filter_params.process_noise = diag([0.1 0.1 0.1 0.03 0.03 0.03]).^2;
 
 % Map PHD config
-filter_params.birthGM_intensity = 0.01;
-filter_params.birthGM_cov = [0.02, 0, 0; 0, 0.02, 0; 0, 0, 0.02];
+filter_params.birthGM_intensity = 0.1;
+filter_params.birthGM_cov = [0.1, 0, 0; 0, 0.1, 0; 0, 0, 0.1];
 
 % Sensor model
 filter_params.map_Q = diag([0.01, 0.01, 0.01].^2);
@@ -62,13 +62,13 @@ filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
 
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
-filter_params.clutter_intensity = 3 / (50^2 * 0.3 * pi);
-filter_params.P_d = 0.8;
+filter_params.clutter_intensity = 2 / (15^2 * 0.3 * 0.2 * pi^2);
+filter_params.P_d = 0.9;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 0.3;
-filter_params.num_GM_cap = 5000;
+filter_params.merge_dist = 4;
+filter_params.num_GM_cap = 6000;
 
 est.filter_params = filter_params;
 
@@ -283,9 +283,14 @@ for i = 2:size(time_vec,2)
                 l = l + 1;
                 tau = zeros(1,num_GM);
                 for jj = 1:num_GM
+                    % tau(1,jj) = filter_params.P_d * ...
+                    %     GM_inten_in_prev(jj) * ...
+                    %     mvnpdf(meas(:,zz),pred_z(:,jj),S(:,:,jj));
+                    zdiff = meas(:, zz) - pred_z(:,jj);
                     tau(1,jj) = filter_params.P_d * ...
                         GM_inten_in_prev(jj) * ...
-                        mvnpdf(meas(:,zz),pred_z(:,jj),S(:,:,jj));
+                        1 / sqrt(det(S(:,:,jj)) * (2*pi) ^size(filter_params.R,1))*...
+                        exp(-0.5*(zdiff)' * Sinv(:,:,jj) * zdiff );
                     mu = GM_mu_in_prev(:,jj) + K(:,:,jj)* (meas(:,zz) - pred_z(:,jj));
                     GM_mu_in = horzcat(GM_mu_in, mu);
                     GM_cov_in = cat(3,GM_cov_in, P(:,:,jj));
@@ -346,7 +351,7 @@ for i = 2:size(time_vec,2)
         cur_GM_mu = particles(1,max_w_particle_ind).gm_mu;
         matrix_dist = repmat(new_meas_world_frame(:,zz),1, size(cur_GM_mu,2)) - cur_GM_mu;
         dist = vecnorm(matrix_dist);
-        if min(dist) >= 5 % If the measurement is not close to any existing landmark/target
+        if min(dist) >= 0.3 % If the measurement is not close to any existing landmark/target
             new_birth_inten = horzcat (new_birth_inten, filter_params.birthGM_intensity);
             new_birth_mu = cat (2,new_birth_mu, new_meas_world_frame(:,zz));
             new_birth_cov = cat (3, new_birth_cov, filter_params.birthGM_cov);
@@ -442,7 +447,10 @@ set(gca, 'Zdir', 'reverse')
 set(gca, 'Ydir', 'reverse')
 grid on
 
-scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),marker_size,'k')
+scatter3(truth.cumulative_landmark_in_FOV{end,1}(1,:),...
+            truth.cumulative_landmark_in_FOV{end,1}(2,:),...
+            truth.cumulative_landmark_in_FOV{end,1}(3,:),...
+            ones(size(truth.cumulative_landmark_in_FOV{end,1},2),1) * 10,'k')
 scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
 scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
 %for j=1:size(particles,2)
@@ -467,31 +475,3 @@ simulation.truth = truth;
 simulation.odom = odom;
 simulation.est = est;
 simulation.filter_params = filter_params;
-
-figure(1)
-draw_trajectory(truth.pos(:,i), truth.quat(i,:), truth.pos(:,1:i), 1, 10, 2,'k',false);
-draw_trajectory(est.pos(:,i), est.quat(i,:), est.pos(:,1:i), 1, 10, 2,'g',true);
-hold on
-set(gca, 'Zdir', 'reverse')
-set(gca, 'Ydir', 'reverse')
-grid on
-%view([0,90])
-
-scatter3(truth.landmark_locations(1,:),truth.landmark_locations(2,:),truth.landmark_locations(3,:),'k')
-scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
-scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
-%for j=1:size(particles,2)
-%    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
-%end
-hold off
-%draw_particle_pos(particles,1)
-xlabel("X");
-ylabel("Y");
-zlabel("Z");
-%xlim([-(map_size + 5), (map_size + 5)])
-%ylim([-(map_size + 5), (map_size + 5)])
-xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
-ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
-axis equal
-title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
-title(title_str)
