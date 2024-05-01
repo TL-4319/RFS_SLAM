@@ -5,11 +5,11 @@ clc;
 
 addpath("util/")
 rng(69431);
-dt = 0.03;
+dt = 0.06;
 draw = false;
 %% Generate landmark map
 map_size = 100;
-num_landmark = 3000;
+num_landmark = 6000;
 landmark_locations = vertcat((rand(1,num_landmark)-0.2) * 2 * map_size ,...
     (rand(1,num_landmark)-0.2) * 2 * map_size, (rand(1,num_landmark)-0.9) * 3);
 marker_size = ones(size(landmark_locations,2),1) * 10;
@@ -170,6 +170,25 @@ for i=2:size(time_vec,2)
     end
 end
 
+figure(1)
+draw_trajectory(pos(:,i), quat(i,:), pos(:,1:i-1), 1, 10, 2,'k',false);
+set(gca, 'Zdir', 'reverse')
+set(gca, 'Ydir', 'reverse')
+grid on
+%view([0,40])
+hold on
+%scatter3(landmark_locations(1,:),landmark_locations(2,:),landmark_locations(3,:),ones(size(landmark_locations,2),1) * 10,'k')
+marker_size = ones(size(truth.cumulative_landmark_in_FOV{end,1},2),1) * 10;
+scatter3(truth.cumulative_landmark_in_FOV{end,1}(1,:),truth.cumulative_landmark_in_FOV{end,1}(2,:),truth.cumulative_landmark_in_FOV{end,1}(3,:), marker_size,'magenta')
+%scatter3(meas_world(1,:), meas_world(2,:), meas_world(3,:), 'b*')
+hold off
+xlabel("X");
+ylabel("Y");
+zlabel("Z");
+
+axis equal
+indx_name = pad(sprintf('%d',i), 3, 'left','0');
+zlim([-4 1])
 
 
 

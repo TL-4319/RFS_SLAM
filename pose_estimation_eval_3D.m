@@ -6,7 +6,7 @@ addpath('util/')
 
 %% Parse data
 % Parse estimations
-load ("sim-result/3d-15hz/phd-slam2-100-1.mat");
+load ("sim-result/3d-new/phd-slam1-100-15hz-0.mat");
 
 % Parse measurement table
 %load ("dataset/meas_table_2.mat");
@@ -155,11 +155,8 @@ set(gca, 'Ydir', 'reverse')
 grid on
 %view([0,90])
 
-scatter3(simulation.truth.landmark_locations(1,:),simulation.truth.landmark_locations(2,:),simulation.truth.landmark_locations(3,:),'k')
+scatter3(simulation.truth.cumulative_landmark_in_FOV{end,1}(1,:),simulation.truth.cumulative_landmark_in_FOV{end,1}(2,:),simulation.truth.cumulative_landmark_in_FOV{end,1}(3,:),ones(1,size(simulation.truth.cumulative_landmark_in_FOV{end,1},2))*10,'k')
 scatter3(simulation.est.map_est{tt,1}(1,:), simulation.est.map_est{tt,1}(2,:), simulation.est.map_est{tt,1}(3,:),'r+')
-%for j=1:size(particles,2)
-%    scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
-%end
 hold off
 %draw_particle_pos(particles,1)
 xlabel("X");

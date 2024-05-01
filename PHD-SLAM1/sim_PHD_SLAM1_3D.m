@@ -4,13 +4,13 @@ clear;
 clc;
 
 %% 
-rng(309);
+rng(790);
 draw = true;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_3D_15hz_with_pitch.mat');
+load('../dataset/truth_3D_15hz_dense.mat');
 %load('../dataset/meas_table_2.mat');
 %truth_hist = truth.pos(:,1);
 %truth.meas_table = meas_table;
@@ -201,7 +201,7 @@ for i=2:size(time_vec,2)
             %Parlikeli(1,par_ind) = (prod(likelipz,2) + 1e-99) *
             %cur_particle.w;  From Lin Gao code
             Parlikeli(1,par_ind) = exp(sum(GM_inten_in_prev,2)) * (prod(likelipz,2) + 1e-99) * cur_particle.w;
-
+            particles(1,par_ind).w = Parlikeli(1,par_ind);
             %% Update missed detection terms
             GM_inten_in = (1 - filter_params.P_d) * GM_inten_in_prev;
 
@@ -296,10 +296,10 @@ for i=2:size(time_vec,2)
         for par_ind = 1:filter_params.num_particle
             particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
             particles(1,par_ind).quat = particles(1,resample_ind(1,par_ind)).quat;
-            particles(1,par_ind).w = particles(1,resample_ind(1,par_ind)).w;
             particles(1,par_ind).gm_mu = particles(1,resample_ind(1,par_ind)).gm_mu;
             particles(1,par_ind).gm_inten = particles(1,resample_ind(1,par_ind)).gm_inten;
             particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
+            particles(1,par_ind).w = 1/filter_params.num_particle;
         end
     end
     est.compute_time(1,i) = toc;
