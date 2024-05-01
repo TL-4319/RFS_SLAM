@@ -10,7 +10,7 @@ draw = false;
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_3D_15hz_with_pitch.mat');
+load('../dataset/truth_3D_15hz_dense.mat');
 marker_size = ones(size(truth.landmark_locations,2),1) * 10;
 
 %% Time vector 
@@ -63,7 +63,7 @@ filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
 
 %clutter_intensity = sensor.clutter_rate / (sensor.Range^2 * sensor.HFOV * 0.5) * 1e-4;
 filter_params.clutter_intensity = 2 / (15^2 * 0.3 * 0.2 * pi^2);
-filter_params.P_d = 0.9;
+filter_params.P_d = 0.8;
 
 % PHD management parameters
 filter_params.pruning_thres = 10^-5;
@@ -263,7 +263,10 @@ for i = 2:size(time_vec,2)
             for jj = 1:size(meas,2)
                 likelipf = zeros (1,num_GM);
                 for kk = 1:num_GM
-                    zdiff = meas(:, jj) - pred_z(:,kk);                
+                    % zdiff = meas(:, jj) - pred_z(:,kk);                
+                    % likelipf (1,kk) = 1 / sqrt(det(S(:,:,kk)) * (2*pi) ^size(filter_params.R,1))*...
+                    %     exp(-0.5*(zdiff)' * Sinv(:,:,kk) * zdiff ) * ...
+                    %     GM_inten_in_prev(kk);
                     likelipf (1,kk) = 1 / sqrt(det(S(:,:,kk)) * (2*pi) ^size(filter_params.R,1))*...
                         exp(-0.5*(zdiff)' * Sinv(:,:,kk) * zdiff ) * ...
                         GM_inten_in_prev(kk);
@@ -283,14 +286,14 @@ for i = 2:size(time_vec,2)
                 l = l + 1;
                 tau = zeros(1,num_GM);
                 for jj = 1:num_GM
-                    % tau(1,jj) = filter_params.P_d * ...
-                    %     GM_inten_in_prev(jj) * ...
-                    %     mvnpdf(meas(:,zz),pred_z(:,jj),S(:,:,jj));
-                    zdiff = meas(:, zz) - pred_z(:,jj);
                     tau(1,jj) = filter_params.P_d * ...
                         GM_inten_in_prev(jj) * ...
-                        1 / sqrt(det(S(:,:,jj)) * (2*pi) ^size(filter_params.R,1))*...
-                        exp(-0.5*(zdiff)' * Sinv(:,:,jj) * zdiff );
+                        mvnpdf(meas(:,zz),pred_z(:,jj),S(:,:,jj));
+                    % zdiff = meas(:, zz) - pred_z(:,jj);
+                    % tau(1,jj) = filter_params.P_d * ...
+                    %     GM_inten_in_prev(jj) * ...
+                    %     1 / sqrt(det(S(:,:,jj)) * (2*pi) ^size(filter_params.R,1))*...
+                    %     exp(-0.5*(zdiff)' * Sinv(:,:,jj) * zdiff );
                     mu = GM_mu_in_prev(:,jj) + K(:,:,jj)* (meas(:,zz) - pred_z(:,jj));
                     GM_mu_in = horzcat(GM_mu_in, mu);
                     GM_cov_in = cat(3,GM_cov_in, P(:,:,jj));
@@ -321,10 +324,12 @@ for i = 2:size(time_vec,2)
     %% State estimation (max likelihood)
     % Trajectory estimation
     [max_likeli, max_w_particle_ind] = max(Parlikeli);
+    wei_ud = Parlikeli/sum(Parlikeli,2);
+    for par_ind = 1:size(particles,2)
+        particles(1,par_ind).w = wei_ud(par_ind);
+    end
     
-    % re normalize weight
-    norm_weight = Parlikeli / sum(Parlikeli,2);
-    norm_weight_sq = norm_weight.^2;
+    norm_weight_sq = wei_ud.^2;
     est.num_effective_part(1,i) = 1 / sum(norm_weight_sq);
 
     % MAP trajectory estimation
@@ -365,7 +370,6 @@ for i = 2:size(time_vec,2)
 
     %% Resample particles (from Lin Gao)
     if filter_params.resample_scheme == 1
-        wei_ud = Parlikeli / sum(Parlikeli,2);
         resample_ind = low_variance_resample(wei_ud, filter_params.num_particle);
         for par_ind = 1:filter_params.num_particle
             particles(1,par_ind).pos = particles(1,resample_ind(1,par_ind)).pos;
@@ -376,7 +380,6 @@ for i = 2:size(time_vec,2)
             particles(1,par_ind).gm_cov = particles(1,resample_ind(1,par_ind)).gm_cov;
         end
     elseif filter_params.resample_scheme == 2 && est.num_effective_part(1,i) < filter_params.resample_trigger
-        wei_ud = Parlikeli / sum(Parlikeli,2);
         resample_ind = low_variance_resample(wei_ud, filter_params.num_particle);
         disp ("Resample triggered")
         for par_ind = 1:filter_params.num_particle
@@ -389,7 +392,7 @@ for i = 2:size(time_vec,2)
         end
     else
         for par_ind = 1:filter_params.num_particle
-            particles(par_ind).w = norm_weight(1,par_ind);
+            particles(par_ind).w = wei_ud(1,par_ind);
         end
     end
 
