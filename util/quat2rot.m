@@ -3,6 +3,9 @@ function R = quat2rot(quat,rotation_frame)
         quat (:,4) {mustBeNumeric}
         rotation_frame {mustBeMember(rotation_frame,["frame", "point"])}
     end
+
+    % "frame" corresponds with inertial to body rotation
+    % "point" corresponds with body to inertial rotation
     
     % orientation
     qw = quat(1);
