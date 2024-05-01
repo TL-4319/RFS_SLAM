@@ -8,7 +8,7 @@ rng(69431);
 dt = 0.2;
 draw = false;
 
-image_rate = 5;
+image_rate = 15;
 imu_rate = 100;
 
 image_dt = 1/image_rate;
@@ -25,7 +25,7 @@ marker_size = ones(size(landmark_locations,2),1) * 10;
 % Sensor properties
 sensor.HFOV = deg2rad(110);
 sensor.VFOV = deg2rad(70);
-sensor.max_range = 20;
+sensor.max_range = 15;
 sensor.min_range = 0.4;
 sensor.P_d = 0.9;
 sensor.clutter_rate = 2;
@@ -35,17 +35,21 @@ sensor.sigma = 0.1;
 waypoints = [0,0,0; ... % Initial position
              20, 10, 0;...
              20, 60, 0; ...
-             40, 80, 0
-             70,100,0];    % Final position
+             40, 80, 0;...
+             50, 80, 0;...
+             90, 80, 0;...
+             100,100,0];    % Final position
 
 orientation_wp = quaternion([0,0,0; ...
                           30,10,0;...
                           90,0,0;...
                           70,0,0;...
+                          50,0,0;...
+                          -10,0,0;...
                           50,0,0],...
                           "eulerd","ZYX","frame");
 
-groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero velocity
+groundspeed = ones(1,size(waypoints,1)) * 0.8; groundspeed(1) = 0; %Initial zero velocity
 
 [pos, quat, trans_vel, vel_world, acc_body, acc_world, rot_vel_body, rot_vel_world, imu_time_vec] = generate_trajectory2(waypoints,...
     orientation_wp, groundspeed, imu_dt);
@@ -60,7 +64,7 @@ last_time = 0;
 for t = 2:size(imu_time_vec,2)
     cur_time = cur_time + imu_dt;
     delta = cur_time-last_time;
-    if abs(delta - image_dt) <= 0.001
+    if abs(delta - image_dt) <= 0.01
         img_time_vec = horzcat(img_time_vec, cur_time);
         has_img(t) = 1;
         last_time = cur_time;
@@ -101,6 +105,7 @@ end
 [meas, landmark_inFOV] = gen_noisy_3D_meas (pos(:,1), quat(1,1), landmark_locations, sensor);
 
 truth.landmark_in_FOV{1,1} = landmark_inFOV;
+truth.cumulative_landmark_in_FOV = truth.landmark_in_FOV;
 
 % Reproject meas into world frame for double checking
 meas_world = reproject_meas (pos(:,1), quat(1,1), meas);
@@ -153,14 +158,17 @@ truth.meas_table{1,1} = meas;
 k = 2;
 
 for i=2:size(imu_time_vec,2)
-    %disp(imu_time_vec(i))
+    disp(imu_time_vec(i))
     
     % Only generate measurement at correct time
     if has_img(i) == 1
         % Generate measurement sets
         [meas, landmark_inFOV] = gen_noisy_3D_meas (pos(:,i), quat(i,:), landmark_locations, sensor);
         
-    
+        temp = unique(vertcat(truth.cumulative_landmark_in_FOV{k-1,1}(:,:)',...
+            landmark_inFOV'),'rows');
+
+        truth.cumulative_landmark_in_FOV{k,1} = temp';
         % Reproject meas into world frame for double checking
         meas_world = reproject_meas (pos(:,i), quat(i,:), meas);
         

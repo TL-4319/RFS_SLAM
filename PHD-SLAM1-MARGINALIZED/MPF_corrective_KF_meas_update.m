@@ -16,7 +16,7 @@ function [x, P] = MPF_corrective_KF_meas_update (prev_state, pred_state, x_prev,
     S = (S + S')/2;
     K = P_prev * F_n' * pinv(S);
     x = x_prev + K * innov;
-    temp = (eye(3) - K * F_n);
+    temp = (eye(6) - K * F_n);
     P = temp * P_prev * temp' + K * R_mat * K';
 end
 
@@ -43,21 +43,34 @@ function f_k = calc_non_linear_f (prev_state, acc, gyr, grav_vec, dt)
     RotM = quat2rot(quat, "point"); % Rotation matrix from body to world
     Sq = quat2Sq(quat);
 
-    f_k(1:3) = pos + dt * vel + 0.5 * dt^2 * (RotM * acc + grav_vec);
-    f_k(4:6) = vel + dt * (RotM * acc + grav_vec);
+    f_k(1:3) = pos + dt * vel + 0.5 * dt^2 * (RotM * acc - grav_vec);
+    f_k(4:6) = vel + dt * (RotM * acc - grav_vec);
     f_k(7:10) = quat' - 0.5 * dt * Sq * gyr;
 end
 
 function F_n = calc_Fn (prev_state, dt)
     % Jacobian of non-linear dynamic wrt linear sub part
     % Implement 5.2b on page 109 in Blesser thesis
-    % Equivalent to measurement Jacobian H wrt to v
+    % Equivalent to measurement Jacobian H wrt to bias
     
+    %% Only gyro bias
+    % quat = compact(prev_state.quat);
+    % Sq = quat2Sq(quat);
+    % 
+    % F_n = zeros(10,3);
+    % 
+    % F_n (7:10, 1:3) = 0.5 * dt * Sq;
     
+    %% Gyro and acc bias
     quat = compact(prev_state.quat);
     Sq = quat2Sq(quat);
+    Rotm = quat2rot(quat,"point");
 
-    F_n = zeros(10,3);
+    F_n = zeros(10,6);
+    
+    F_n(1:3,4:6) = -0.5 * dt^2 * Rotm;
+
+    F_n(4:6,4:6) = -dt * Rotm;
 
     F_n (7:10, 1:3) = 0.5 * dt * Sq;
 end

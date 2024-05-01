@@ -41,8 +41,8 @@ function [GM_mu_out, GM_cov_out, GM_inten_out] = merge_gm(GM_mu, ...
         GM_mu_out (:,el) = zeros(x_dim,1); 
         GM_cov_out(:,:,el) = zeros(x_dim, x_dim);
         for i = I
-            %val = (GM_mu(:,i)-GM_mu(:,j))'* iPt *(GM_mu(:,i)-GM_mu(:,j));
-            val = sqrt((GM_mu(:,i)-GM_mu(:,j))'* (GM_mu(:,i)-GM_mu(:,j)));
+            val = (GM_mu(:,i)-GM_mu(:,j))'* iPt *(GM_mu(:,i)-GM_mu(:,j));
+            %val = sqrt((GM_mu(:,i)-GM_mu(:,j))'* (GM_mu(:,i)-GM_mu(:,j)));
             if val <= merge_dist
                 Ij = [Ij i];
             end
