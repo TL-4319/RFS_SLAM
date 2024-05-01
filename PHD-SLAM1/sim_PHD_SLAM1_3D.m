@@ -201,7 +201,7 @@ for i=2:size(time_vec,2)
             %Parlikeli(1,par_ind) = (prod(likelipz,2) + 1e-99) *
             %cur_particle.w;  From Lin Gao code
             Parlikeli(1,par_ind) = exp(sum(GM_inten_in_prev,2)) * (prod(likelipz,2) + 1e-99) * cur_particle.w;
-            particles(1,par_ind).w = Parlikeli(1,par_ind);
+            
             %% Update missed detection terms
             GM_inten_in = (1 - filter_params.P_d) * GM_inten_in_prev;
 
@@ -287,6 +287,9 @@ for i=2:size(time_vec,2)
 
     %% Resample particles (from Lin Gao)
     wei_ud = Parlikeli / sum(Parlikeli,2);
+    for par_ind = 1:filter_params.num_particle
+        particles(1,par_ind).w = wei_ud(par_ind);
+    end
     est.num_effective_part(:,i) = 1/ sum(wei_ud.^2,2);
     if est.num_effective_part(:,i) < 0.2 * filter_params.num_particle
         dbg_str = sprintf('Num of effective particle is %d . Resample triggered', est.num_effective_part(:,i));
