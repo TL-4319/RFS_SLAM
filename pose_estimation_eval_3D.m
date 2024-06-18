@@ -6,7 +6,7 @@ addpath('util/')
 
 %% Parse data
 % Parse estimations
-load ("sim-result/3d-new/phd-slam1-100-15hz-0.mat");
+load ("sim-result/3d-new/phd-slam1-100-15hz-4.mat");
 
 % Parse measurement table
 %load ("dataset/meas_table_2.mat");

@@ -46,7 +46,7 @@ odom.body_rot_vel = truth.body_rot_vel + normrnd(0,odom.sigma_rot(1),3,size(trut
 
 %% SLAM configuration
 filter_params.resample_scheme = 2; % 0 is no resampling, 1 is resample at every step, 2 is adaptive resample
-filter_params.num_particle = 100;
+filter_params.num_particle = 10;
 filter_params.resample_trigger = filter_params.num_particle * 0.2;
 filter_params.intial_particle_cov = diag([0.1, 0.1, 0.1, 0.01, 0.01, 0.01, 0.01]).^2;
 filter_params.process_noise = diag([0.1 0.1 0.1 0.03 0.03 0.03]).^2;

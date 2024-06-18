@@ -13,7 +13,8 @@ function [measurements, landmark_in_fov] = gen_noisy_3D_meas (pos, quat, landmar
 
     % Add clutter
     num_clutter = poissrnd (sensor.clutter_rate);
-    clutter_range = rand(1,num_clutter) .* (sensor.max_range - sensor.min_range) + sensor.min_range;
+    %clutter_range = rand(1,num_clutter) .* (sensor.max_range - sensor.min_range) + sensor.min_range;
+    clutter_range = rand(1,num_clutter) .* (sensor.max_range - 3) + 3;
     clutter_bearing = (rand(1,num_clutter) - 0.5) * sensor.HFOV/2;
     clutter_elevation = (rand(1,num_clutter) - 0.5) * sensor.VFOV/2;
     clutter_meas(1,:) = cos(clutter_bearing) .* clutter_range;

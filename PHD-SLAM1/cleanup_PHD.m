@@ -36,7 +36,7 @@ function [GM_mu_out, GM_cov_out, GM_inten_out] = merge_gm_lingao(GM_mu, ...
     while ~isempty(I)
         [~, j] = max(GM_inten);
         Ij = [];
-        iPt = inv(GM_cov(:,:,j));
+        iPt = pinv(GM_cov(:,:,j));
         GM_inten_out(el,1) = 0;
         GM_mu_out (:,el) = zeros(x_dim,1); 
         GM_cov_out(:,:,el) = zeros(x_dim, x_dim);
@@ -88,7 +88,7 @@ function [GM_mu_out, GM_cov_out, GM_inten_out] = merge_gm(GM_mu, ...
         L = [];
         for i=I
             % calc mahalonobis dist
-            dist = (GM_mu(:,i) - GM_mu(:,j))' * inv(GM_cov(:,:,i)) * (GM_mu(:,i) - GM_mu(:,j));
+            dist = (GM_mu(:,i) - GM_mu(:,j))' * pinv(GM_cov(:,:,i)) * (GM_mu(:,i) - GM_mu(:,j));
             if dist <= merge_dist
                 L = horzcat(L,i);
             end

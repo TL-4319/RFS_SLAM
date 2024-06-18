@@ -4,13 +4,14 @@ clear;
 clc;
 
 %% 
-rng(790);
-draw = true;
+rng(689);
+draw = false;
 
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/truth_3D_15hz_dense.mat');
+load('../dataset/card_test.mat');
+%load('../dataset/truth_3D_15hz_dense.mat');
 %load('../dataset/meas_table_2.mat');
 %truth_hist = truth.pos(:,1);
 %truth.meas_table = meas_table;
@@ -52,7 +53,7 @@ odom.body_rot_vel = truth.body_rot_vel + normrnd(0,odom.sigma_rot(1),3,size(trut
 
 %% SLAM configuration
 % Trajectory config
-filter_params.num_particle = 100;
+filter_params.num_particle = 1;
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 filter_params.motion_sigma = [0.1; 0.1; 0.1; 0.03; 0.03; 0.03];
 
@@ -65,14 +66,14 @@ filter_params.map_Q = diag([0.01, 0.01, 0.01].^2);
 filter_params.filter_sensor_noise = 0.1;
 filter_params.R = diag([filter_params.filter_sensor_noise^2, ...
     filter_params.filter_sensor_noise^2, filter_params.filter_sensor_noise^2]);
-filter_params.clutter_intensity = 2 / (15^2 * 0.3 * 0.2 * pi^2);
+filter_params.clutter_intensity = 2 / (15^2 * pi);
 %filter_params.clutter_intensity = 2 / (15^2 * 0.2 * pi);
-filter_params.P_d = 0.8;
+filter_params.P_d = 0.9;
 
 % PHD management parameters
-filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 4;
-filter_params.num_GM_cap = 6000;
+filter_params.pruning_thres = 10^-6;
+filter_params.merge_dist = 10;
+filter_params.num_GM_cap = 1000;
 
 est.filter_params = filter_params;
 est.num_effective_part = zeros (1,size(time_vec,2));
@@ -129,8 +130,8 @@ for i=2:size(time_vec,2)
             cur_particle.quat,body_vel_sample, body_rot_vel_sample, dt);
 
         % Give particle truth pose for map debug
-        %cur_particle.pos = truth.pos(:,i);
-        %cur_particle.quat = truth.quat(i,:);
+        cur_particle.pos = truth.pos(:,i);
+        cur_particle.quat = truth.quat(i,:);
 
         particles(1,par_ind).pos = cur_particle.pos;
         particles(1,par_ind).quat = cur_particle.quat;
@@ -196,7 +197,7 @@ for i=2:size(time_vec,2)
                     likelipf (1,kk) = mvnpdf(meas(:,jj),pred_z(:,kk),S(:,:,kk)) * GM_inten_in_prev(kk);
                     
                 end
-                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf* filter_params.P_d,2) ;
+                likelipz(1,jj) = filter_params.clutter_intensity + sum (likelipf * filter_params.P_d,2) ;
             end
             %Parlikeli(1,par_ind) = (prod(likelipz,2) + 1e-99) *
             %cur_particle.w;  From Lin Gao code
@@ -230,7 +231,6 @@ for i=2:size(time_vec,2)
                 end
             end
             %% Clean up GM components
-            % Prune
             [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
                 GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
                 filter_params.merge_dist, filter_params.num_GM_cap);
@@ -323,9 +323,9 @@ for i=2:size(time_vec,2)
             ones(size(truth.cumulative_landmark_in_FOV{end,1},2),1) * 10,'k')
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
-        for j=1:size(particles,2)
-            scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
-        end
+        % for j=1:size(particles,2)
+        %     scatter3(particles(j).pos(1), particles(j).pos(2), particles(j).pos(3),'r.');
+        % end
         hold off
         %draw_particle_pos(particles,1)
         xlabel("X");
@@ -346,7 +346,7 @@ for i=2:size(time_vec,2)
          %exportgraphics(fig2, "phd5.gif", Append=true);
         xlim([-10 120])
         ylim([-10 120])
-        zlim([-4 5])
+        zlim([-10 10])
         %exportgraphics(fig1, "map.gif", Append=true);
         drawnow;
      end
@@ -389,11 +389,13 @@ zlabel("Z");
 %ylim([-(map_size + 5), (map_size + 5)])
 xlim ([min(truth.landmark_locations(1,:)), max(truth.landmark_locations(1,:))])
 ylim([min(truth.landmark_locations(2,:)), max(truth.landmark_locations(2,:))])
+zlim([-10 10])
 axis equal
 title_str = sprintf("Expected num of landmark = %d. is = %d", exp_num_landmark,i);
 title(title_str)
 
 figure(2)
-plot (num_lm_truth);
+plot (time_vec, num_lm_truth, 'DisplayName','truth');
 hold on 
-plot (exp_lm);
+plot (time_vec, exp_lm,'DisplayName','est');
+legend
