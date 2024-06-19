@@ -73,7 +73,7 @@ filter_params.P_d = 0.9;
 % PHD management parameters
 filter_params.pruning_thres = 10^-6;
 filter_params.merge_dist = 10;
-filter_params.num_GM_cap = 1000;
+filter_params.num_GM_cap = 200;
 
 est.filter_params = filter_params;
 est.num_effective_part = zeros (1,size(time_vec,2));

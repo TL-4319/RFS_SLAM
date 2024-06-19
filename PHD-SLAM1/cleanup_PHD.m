@@ -1,7 +1,7 @@
 function [GM_mu_out, GM_cov_out, GM_inten_out] = cleanup_PHD (GM_mu, ...
     GM_cov, GM_inten, pruning_thres, merge_dist, num_GM_cap)
     [mu_prune, cov_prune, inten_out] = prune_gm (GM_mu, GM_cov, GM_inten, pruning_thres);
-    [mu_merge, cov_merge, inten_merge] = merge_gm_lingao (mu_prune, cov_prune, inten_out, merge_dist);
+    [mu_merge, cov_merge, inten_merge] = merge_gm_vo (mu_prune, cov_prune, inten_out, merge_dist);
     [mu_cap, cov_cap, inten_cap] = cap_gm (mu_merge, cov_merge, inten_merge, num_GM_cap);
     GM_mu_out = mu_cap;
     GM_cov_out = cov_cap;
@@ -17,9 +17,9 @@ function [GM_mu_out, GM_cov_out, GM_inten_out] = prune_gm(GM_mu, ...
     GM_inten_out = GM_inten(pass_ind);
 end
 
-function [GM_mu_out, GM_cov_out, GM_inten_out] = merge_gm_lingao(GM_mu, ...
+function [GM_mu_out, GM_cov_out, GM_inten_out] = merge_gm_vo(GM_mu, ...
     GM_cov, GM_inten, merge_dist)
-    % LINGAO'S IMPLEMENTATION
+    % VO'S IMPLEMENTATION
     L = size(GM_inten,2);
     x_dim = size(GM_mu,1);
     I = 1:L;
@@ -131,5 +131,6 @@ function [GM_mu_out, GM_cov_out, GM_inten_out] = cap_gm (GM_mu, ...
         GM_mu_out = GM_mu (:,pass_ind);
         GM_cov_out = GM_cov (:,:,pass_ind);
         GM_inten_out = GM_inten (pass_ind);
+        GM_inten_out = GM_inten_out * (sum(GM_inten)/sum(GM_inten_out));
     end
 end
