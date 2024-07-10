@@ -10,8 +10,8 @@ draw = false;
 %% Load truth and measurement data
 addpath ('../util/')
 
-load('../dataset/card_test.mat');
-%load('../dataset/truth_3D_15hz_dense.mat');
+%load('../dataset/card_test.mat');
+load('../dataset/truth_3D_15hz_dense.mat');
 %load('../dataset/meas_table_2.mat');
 %truth_hist = truth.pos(:,1);
 %truth.meas_table = meas_table;
