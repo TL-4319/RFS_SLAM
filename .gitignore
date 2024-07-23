@@ -1,0 +1,9 @@
+# Ignore MATLAB temp files
+*.asv
+
+# Ignore any media files
+*.avi
+*.gif
+
+# Ignore datasets
+/2D/generated_datasets/*.mat
