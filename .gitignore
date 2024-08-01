@@ -6,4 +6,6 @@
 *.gif
 
 # Ignore datasets
-/2D/generated_datasets/*.mat
+/2D/generated_datasets/
+# Ignore result
+/2D/sim-result/

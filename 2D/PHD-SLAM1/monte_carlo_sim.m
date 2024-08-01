@@ -8,7 +8,7 @@ clc;
 num_run = 1;
 
 % Visualization
-draw = true;
+draw = false;
 
 % add path to util functions. 
 addpath('../../util/')
@@ -77,7 +77,13 @@ simulation.filter_params = filter_params;
 simulation.odom_params = odom_params;
 
 results = cell(num_run,1);
+file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
 for ii = 1:num_run
     results{ii,1} = phd_slam1_2d_instance(dataset,sensor_params, odom_params, filter_params, draw);
 end
+
+simulation.result = results;
+
+
+save(file_name,"simulation");

@@ -220,18 +220,21 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
 
     end %kk = 2:size(time_vec,2)
     
-    % Write video
-    obj = VideoWriter("myvideo");
-    obj.FrameRate = 20;
-    open(obj);
-    for i=1:length(frame)
-        writeVideo(obj,frame{i})
+    if draw
+        % Write video
+        obj = VideoWriter("myvideo");
+        obj.FrameRate = 20;
+        open(obj);
+        for i=1:length(frame)
+            writeVideo(obj,frame{i})
+        end
+        obj.close();
     end
-    obj.close();
     % End simulation
     results.truth = truth;
     results.filter_est = est;
     results.odom_est = odom;
+    results.time_vec = time_vec;
 
 
 end
