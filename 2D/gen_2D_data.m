@@ -49,7 +49,8 @@ groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero v
 
 % Generate pose
 dt = 1/data_rate_hz;
-[pos, quat, trans_vel_body, acc_body, acc_world, rot_vel_body, rot_vel_world, time_vec] = generate_trajectory(waypoints,...
+[pos, quat, trans_vel_body, acc_body, acc_world, rot_vel_body, ...
+    rot_vel_world, time_vec] = generate_trajectory(waypoints,...
     orientation_wp, groundspeed, dt);
 
 %%
