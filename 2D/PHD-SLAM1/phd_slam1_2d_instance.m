@@ -8,6 +8,8 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         fig1 = figure(1);
         title ("Sim world")
         fig1.Position = [1,1,2000,2000];
+
+        frame = cell(size(time_vec,2)-1,1);
     end
 
     %% Prepare truth data struct
@@ -195,9 +197,11 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         scatter3(truth.cummulative_landmark_in_FOV{end,1}(1,:),...
             truth.cummulative_landmark_in_FOV{end,1}(2,:),...
             truth.cummulative_landmark_in_FOV{end,1}(3,:),...
-            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 10,'k')
-        scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:), 'b*')
-        scatter3(map_est(1,:), map_est(2,:), map_est(3,:),'r+')
+            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 50,'k')
+        scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
+            ones(size(meas_reprojected,2),1) * 50,'b*');
+        scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
+            ones(size(map_est,2),1) * 50,'r+')
         xlabel("X (m)");
         ylabel("Y (m)");
         zlabel("Z (m)");
@@ -209,12 +213,21 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         colorbar
         title(title_str)
         view(0,90)
+        drawnow
+        frame{kk-1} = getframe(gcf);
         end %draw
         
 
     end %kk = 2:size(time_vec,2)
-
-
+    
+    % Write video
+    obj = VideoWriter("myvideo");
+    obj.FrameRate = 20;
+    open(obj);
+    for i=1:length(frame)
+        writeVideo(obj,frame{i})
+    end
+    obj.close();
     % End simulation
     results.truth = truth;
     results.filter_est = est;
