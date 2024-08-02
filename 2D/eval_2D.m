@@ -69,6 +69,12 @@ for kk = 2:size(time_vec,2)
 end
 
 % COLA of total map
+cola_c = ospa_c;
+cola_p = ospa_p;
+
+cola_val = zeros(1,3);
+[cola_vals(kk,1), cola_vals(kk,2), cola_vals(kk,3)] = cola_dist (true_map,...
+    est_map, cola_c, cola_p);
 
 %% Plot
 figure(1)

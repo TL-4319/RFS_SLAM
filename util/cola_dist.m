@@ -43,12 +43,11 @@ n = size(X,2);
 m = size(Y,2);
 
 %%
-% TODO CHANGE COST FUNCTION TO REFLECT COLA METRICS
 %Calculate cost/weight matrix for pairings - fast method with vectorization
 XX= repmat(X,[1 m]);
 YY= reshape(repmat(Y,[n 1]),[size(Y,1) n*m]);
 D = reshape(sqrt(sum((XX-YY).^2)),[n m]);
-D = min(c,D).^p;
+D = (min(c,D)/c).^p;
 
 % %Calculate cost/weight matrix for pairings - slow method with for loop
 % D= zeros(n,m);
@@ -61,11 +60,11 @@ D = min(c,D).^p;
 [assignment,cost]= Hungarian(D);
 
 %Calculate final distance
-dist= ( 1/max(m,n)*( c^p*abs(m-n)+ cost ) ) ^(1/p);
+dist= (abs(m-n)+ cost) ^(1/p);
 
 %Output components if called for in varargout
 if nargout == 3
-    varargout(1)= {(1/max(m,n)*cost)^(1/p)};
-    varargout(2)= {(1/max(m,n)*c^p*abs(m-n))^(1/p)};
+    varargout(1)= {cost^(1/p)};
+    varargout(2)= {abs(m-n)^(1/p)};
 end
     
