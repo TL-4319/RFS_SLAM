@@ -2,7 +2,7 @@ close all;
 clear; 
 clc;
 
-addpath('../../util/')
+addpath('../util/')
 
 %% Select simulation
 % Parse simulation
@@ -55,6 +55,21 @@ odom_pos_error = odom_pos - true_pos;
 odom_dis_error = vecnorm(odom_pos_error);
 
 odom_euler_error = odom_euler - true_euler;
+
+%% Mapping error
+% Time varying OSPA
+ospa_c = 2;
+ospa_p = 2;
+ospa_vals = zeros(size(time_vec,2),3);
+for kk = 2:size(time_vec,2)
+    true_map = get_comps(simulation.result{1,1}.truth.cummulative_landmark_in_FOV{1,1},[1,2]);
+    est_map = get_comps(simulation.result{1,1}.truth.cummulative_landmark_in_FOV{1,1},[1,2]);
+    [ospa_vals(kk,1), ospa_vals(kk,2), ospa_vals(kk,3)] = ospa_dist (true_map,...
+        est_map, ospa_c, ospa_p);
+end
+
+% COLA of total map
+
 %% Plot
 figure(1)
 subplot (2,1,1)
@@ -96,16 +111,31 @@ grid on
 title("Rotational error")
 legend
 
-figure (4)
-draw_trajectory(true_pos(:,end), true_quat(end,:), true_pos, 4, 2, 'k', false)
-draw_trajectory(est_pos(:,end), est_quat(end,:), est_pos, 4, 2,'g',true);
-draw_trajectory(odom_pos(:,end), odom_quat(end,:),odom_pos, 4, 2,'r',true);
-hold on
-set(gca, 'Zdir', 'reverse')
-set(gca, 'Ydir', 'reverse')
+figure(4)
+subplot (3,1,1);
+plot (time_vec, ospa_vals(:,1),'k')
+ylabel('OPSA Dist')
+ylim([0 ospa_c])
 grid on
-view([0,90])
-plot ([0,0], [0,0],'k','DisplayName','True trajectory')
-plot ([0,0], [0,0],'g','DisplayName','Estimated trajectory')
-plot ([0,0], [0,0],'r','DisplayName','Odometry trajectory')
-legend
+
+subplot (3,1,2);
+plot (time_vec, ospa_vals(:,2),'k')
+ylabel('OPSA Loc')
+ylim([0 ospa_c])
+grid on
+
+subplot (3,1,3);
+plot (time_vec, ospa_vals(:,3),'k')
+ylabel('OPSA Card')
+ylim([0 ospa_c])
+grid on
+
+
+%% Util functions
+function Xc= get_comps(X,c)
+    if isempty(X)
+        Xc= [];
+    else
+        Xc= X(c,:);
+    end
+end
