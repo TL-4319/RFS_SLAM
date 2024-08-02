@@ -1,4 +1,4 @@
-function [pose_est, map_est] = extract_estimates_max_likeli (particle)
+function [pose_est, map_est] = extract_estimates_max_likeli (particle, filter_params)
     %% Extract the pose and map estimate using maximum likelihood
     likeli_vec = zeros(1,size(particle,2));
     for par_ind = 1:size(particle,2)
@@ -17,7 +17,8 @@ function [pose_est, map_est] = extract_estimates_max_likeli (particle)
     
     % Find expected number of landmark
     map_est.exp_num_landmark = round(sum(max_likeli_gm_inten));
-    [~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
+    %[~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
+    [~, ID_map] = find(max_likeli_gm_inten > filter_params.GM_inten_thres);
     map_est.feature_pos = max_likeli_gm_mu(:,ID_map);
     map_est.max_likeli_gm_mu = max_likeli_gm_mu;
     map_est.max_likeli_gm_cov = max_likeli_gm_cov;

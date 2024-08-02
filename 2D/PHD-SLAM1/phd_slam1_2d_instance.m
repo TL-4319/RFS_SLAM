@@ -7,7 +7,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     if draw
         fig1 = figure(1);
         title ("Sim world")
-        fig1.Position = [1,1,2000,2000];
+        fig1.Position = [1,1,1000,1000];
 
         frame = cell(size(time_vec,2)-1,1);
     end
@@ -19,6 +19,8 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     % Prepare some odom estimation
     odom.pos = truth.pos;
     odom.quat = truth.quat;
+    odom.body_trans_vel = zeros(3,size(time_vec,2));
+    odom.body_rot_vel = odom.body_trans_vel;
 
     % Pre run the sim to generate map and mease data. Should help with run 
     % time as well
@@ -52,6 +54,9 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     
             body_trans_vel = dataset.trans_vel_body(:,kk) + body_trans_vel_sample;
             body_rot_vel = dataset.rot_vel_body(:,kk) + body_rot_vel_sample;
+
+            odom.body_trans_vel(:,kk) = body_trans_vel;
+            odom.body_rot_vel(:,kk) = body_rot_vel;
 
             [odom.pos(:,kk), odom.quat(kk,:)] = ...
                 propagate_state (odom.pos(:,kk-1), odom.quat(kk-1,:),...
@@ -103,8 +108,8 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
                 body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
 
                 % Add noise to odom measurement
-                body_trans_vel = dataset.trans_vel_body(:,kk) + body_trans_vel_sample;
-                body_rot_vel = dataset.rot_vel_body(:,kk) + body_rot_vel_sample;
+                body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
+                body_rot_vel = odom.body_rot_vel(:,kk) + body_rot_vel_sample;
                 
                 [cur_pos, cur_quat] = ...
                     propagate_state (particles(1,par_ind).pos, particles(1,par_ind).quat,...
@@ -169,7 +174,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         end %par_ind = 1:size(particles,2)
 
         %% State estimation
-        [pose_est, map_est_struct] = extract_estimates_max_likeli(particles);
+        [pose_est, map_est_struct] = extract_estimates_max_likeli(particles, filter_params);
         est.pos(:,kk) = pose_est.pos;
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
@@ -190,6 +195,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         figure(1)
         draw_trajectory(truth.pos(:,kk), truth.quat(kk,:), truth.pos(:,1:kk),4, 2,'k',false);
         draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
+        draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 4, 2, 'r',true);
         hold on
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
