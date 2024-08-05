@@ -185,7 +185,10 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         particles = adaptive_birth_PHD_2D (pose_est.pos, pose_est.quat, cur_meas, map_est_struct, filter_params, particles);
         
         % Resample (if needed)
-        [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+        if mod(kk,20) == 0
+            disp("check resample")
+            [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+        end
 
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
@@ -215,7 +218,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
         ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
-        plot_2D_phd(map_est_struct,200,0,1)
+        plot_2D_phd(map_est_struct,500,0,1)
         colorbar
         title(title_str)
         view(0,90)
