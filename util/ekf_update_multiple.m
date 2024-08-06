@@ -1,4 +1,4 @@
-function [qz_update,m_update,P_update] = ekf_update_multiple(z,particle,m,P, sensor_params)
+function [qz_update,m_update,P_update, P_d_vec] = ekf_update_multiple(z,particle,m,P, sensor_params)
 
 plength= size(m,2);
 zlength= size(z,2);
@@ -6,17 +6,20 @@ zlength= size(z,2);
 qz_update= zeros(plength,zlength);
 m_update = zeros(size(m,1),plength,zlength);
 P_update = zeros(size(m,1),size(m,1),plength);
+P_d_vec = zeros(1, plength);
 
 for idxp=1:plength
-        [qz_temp,m_temp,P_temp] = ekf_update_single(z,particle,m(:,idxp),P(:,:,idxp), sensor_params);
-       qz_update(idxp,:)   = qz_temp;
+        [qz_temp,m_temp,P_temp, PD] = ekf_update_single(z,particle,m(:,idxp),P(:,:,idxp), sensor_params);
+       qz_update(idxp,:)   = qz_temp * PD;
         m_update(:,idxp,:) = m_temp;
         P_update(:,:,idxp) = P_temp;
+        P_d_vec (:,idxp) = PD;
 end
 
-function [qz_temp,m_temp,P_temp] = ekf_update_single(z,particle,m,P, sensor_params)
+function [qz_temp,m_temp,P_temp, PD] = ekf_update_single(z,particle,m,P, sensor_params)
 m = vertcat(m,zeros(1,size(m,2)));
-[~,eta,~] = gen_meas_cartesian_2D(particle.pos, particle.quat, m, sensor_params);
+[~,eta,~, PD_mult] = gen_meas_cartesian_2D(particle.pos, particle.quat, m, sensor_params);
+PD = PD_mult * sensor_params.detect_prob;
 eta(3,:) = [];
 m(3,:) = [];
 

@@ -5,10 +5,10 @@ clear;
 clc;
 
 % Define number of MC runs
-num_run = 1;
+num_run = 500;
 
 % Visualization
-draw = true;
+draw = false;
 
 % add path to util functions. 
 addpath('../../util/')
@@ -25,7 +25,8 @@ sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
 sensor_params.detect_prob = 0.8;
 sensor_params.measurement_std = [0.1, 0.1]; 
-sensor_params.avg_num_clutter = 2;
+sensor_params.avg_num_clutter = 1;
+sensor_params.near_edge_PD_mult = 1;
 
 %sensor_params.meas_area = sensor_params.HFOV * 0.5 * ...
 %    (sensor_params.max_range - sensor_params.min_range)^2;
@@ -42,7 +43,8 @@ odom_params.motion_sigma = [0.5; 0.5; 0.2];
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
 filter_params.sensor.detect_prob = 0.8;
 filter_params.sensor.measurement_std = [0.1, 0.1];
-filter_params.sensor.avg_num_clutter = 2 * 10^-4;
+filter_params.sensor.avg_num_clutter = 1;
+
 
 % Particle filter params
 filter_params.num_particle = 1;
@@ -66,7 +68,7 @@ filter_params.num_GM_cap = 7000;
 filter_params.inner_filter = 'ekf';
 
 % NO INPUT REQUIRED for the rest of the section
-% Calculate corresponding matrices
+% Calculate corresponding maresults{1, 1}.truth.cummulative_landmark_in_FOVtrices
 filter_params.sensor.clutter_density = filter_params.sensor.avg_num_clutter / ...
     filter_params.sensor.meas_area;
 filter_params.sensor.R = diag(filter_params.sensor.measurement_std.^2);
@@ -82,6 +84,7 @@ results = cell(num_run,1);
 file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
 for ii = 1:num_run
+    disp(ii)
     results{ii,1} = phd_slam1_2d_instance(dataset,sensor_params, odom_params, filter_params, draw);
 end
 

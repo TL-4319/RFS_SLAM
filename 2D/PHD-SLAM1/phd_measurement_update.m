@@ -19,11 +19,11 @@ phd_measurement_update (particle, GM_mu, GM_cov, GM_inten, meas, filter_params)
         % Update GM components as detected
         meas = meas(1:2,:); % Only get the 2D measurement
         
-        [qz_temp, m_temp, P_temp] = ekf_update_multiple(meas, particle, GM_mu, GM_cov, filter_params.sensor);
+        [qz_temp, m_temp, P_temp, P_d_vec] = ekf_update_multiple(meas, particle, GM_mu, GM_cov, filter_params.sensor);
         
         likelipz = zeros(1,size(meas,2));
         for zz = 1:size(meas,2)
-            w_temp  = filter_params.sensor.detect_prob * GM_inten_prev(:) .* ...
+            w_temp  = GM_inten_prev(:) .* ...
                 qz_temp (:,zz);
             w_temp = w_temp ./ (filter_params.sensor.clutter_density + sum(w_temp));
             GM_inten = cat(2,GM_inten, w_temp');
