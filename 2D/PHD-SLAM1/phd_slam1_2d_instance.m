@@ -1,6 +1,6 @@
 function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
-    rng(420)
+    %rng(420)
     time_vec = dataset.time_vec;
     dt = time_vec(2) - time_vec(1);
 
@@ -28,7 +28,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     meas_table = cell(size(time_vec,2),1);
     disp('Pre generate odom est, measurements and cummulative landmark map')
     for kk = 1:size(time_vec,2)
-        [cur_meas, ~,landmark_in_FOV] = gen_meas_cartesian_2D(truth.pos(:,kk),...
+        [cur_meas, ~,landmark_in_FOV,~] = gen_meas_cartesian_2D(truth.pos(:,kk),...
             truth.quat(kk,:),dataset.landmark_locations, sensor_params);
 
         meas_table{kk,:} = cur_meas;
@@ -185,7 +185,10 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         particles = adaptive_birth_PHD_2D (pose_est.pos, pose_est.quat, cur_meas, map_est_struct, filter_params, particles);
         
         % Resample (if needed)
-        [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+        if mod(kk,20) == 0
+            disp("check resample")
+            [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+        end
 
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
@@ -200,10 +203,16 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
-        scatter3(truth.cummulative_landmark_in_FOV{end,1}(1,:),...
-            truth.cummulative_landmark_in_FOV{end,1}(2,:),...
-            truth.cummulative_landmark_in_FOV{end,1}(3,:),...
-            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 50,'k')
+        scatter3(truth.cummulative_landmark_in_FOV{kk,1}(1,:),...
+            truth.cummulative_landmark_in_FOV{kk,1}(2,:),...
+            truth.cummulative_landmark_in_FOV{kk,1}(3,:),...
+            ones(size(truth.cummulative_landmark_in_FOV{kk,1},2),1) * 50,'k')
+        landmark_not_in_fov = setdiff(truth.cummulative_landmark_in_FOV{end,1}(:,:)',...
+            truth.cummulative_landmark_in_FOV{kk,1}(:,:)',"rows");
+        scatter3(landmark_not_in_fov(:,1),...
+            landmark_not_in_fov(:,2),...
+            landmark_not_in_fov(:,3),...
+            ones(size(landmark_not_in_fov(:,1),1),1) * 10,'k')
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
             ones(size(meas_reprojected,2),1) * 50,'b*');
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
@@ -215,7 +224,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
         ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
-        plot_2D_phd(map_est_struct,200,0,1)
+        plot_2D_phd(map_est_struct,500,0,1)
         colorbar
         title(title_str)
         view(0,90)
