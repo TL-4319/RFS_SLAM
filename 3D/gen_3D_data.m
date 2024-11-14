@@ -11,23 +11,23 @@ clc
 addpath("../util/")
 
 % Seed the RNG
-rng(420);
+rng(100);
 
-% Enable or disable visualization
-draw = true;
+% Enable or disable visualization. False is faster
+draw = false;
 
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 50;
-num_landmark = 500;
+num_landmark = 1000;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
-landmark_locations(:,3) = (rand(num_landmark,1) - 0.5) * 0.3 + 1.5; % This aim to simulate planetary env where features are terrain based on ground
+landmark_locations(:,3) = (rand(num_landmark,1) - 0.5) * 0.3 ; % This aim to simulate planetary env where features are terrain based on ground
 landmark_locations = landmark_locations';
 
 %% Define principal sampling rate of simulation
 % This is equivalent to the sampling rate of the fastest available sensor
 % you want to simulate
 
-data_rate_hz = 10; %
+data_rate_hz = 100; %
 
 %% Define trajectory
 % Generate trajectory - EDIT HERE TO CHANGE ROBOT PATH
@@ -37,11 +37,11 @@ waypoints = [0,0,0; ... % Initial position
              12, 0, 0; ...
              50,40,0];    % Final position
 
-orientation_wp = quaternion([0,-20,0; ...
-                          0,-20,0;...
-                          0,-20,0;...
-                          1,-20,0;...
-                          60,-20,0],...
+orientation_wp = quaternion([0,0,0; ...
+                          0,0,0;...
+                          0,0,0;...
+                          1,0,0;...
+                          60,0,0],...
                           "eulerd","ZYX","frame");
 
 % Define ground speed. This can be constant or variable
@@ -55,11 +55,25 @@ dt = 1/data_rate_hz;
     orientation_wp, groundspeed, dt);
 
 %%
+% Here pos is the robot body pose. Sensor pose is annotated
 dataset.pos = pos;
 dataset.quat = quat;
 dataset.trans_vel_body = trans_vel_body;
 dataset.rot_vel_body = rot_vel_body;
 dataset.accel_body = acc_body;
+
+% Calculate sensor pose in world
+dataset.pos_body_sensor = [1;0;-1.5];
+dataset.quat_body_sensor = quaternion([0, -20, 0],"eulerd","ZYX","frame");
+
+% Calculate sensor pose 
+dataset.pos_sensor = dataset.pos;
+dataset.quat_sensor = dataset.quat;
+for ii = 1:size(dataset.pos,2)
+    dataset.pos_sensor(:,ii) = dataset.pos(:,ii) +...
+        transpose(rotatepoint(dataset.quat(ii),dataset.pos_body_sensor'));
+    dataset.quat_sensor(ii) = quatmultiply(dataset.quat_body_sensor, dataset.quat(ii));
+end
 
 % Extra measurement can be used to simulate IMU
 dataset.rot_vel_world = rot_vel_world;
@@ -72,11 +86,12 @@ dataset.landmark_locations = landmark_locations;
 if draw
     for kk = 1:size(time_vec,2)
         figure(1)
-        draw_trajectory(pos(:,kk), quat(kk,:),pos(:,1:kk-1), 5, 2, 'k',false)
+        draw_trajectory(pos(:,kk), quat(kk,:),pos(:,1:kk-1), 2, 2, 'k',false)
+        draw_trajectory(dataset.pos_sensor(:,kk), dataset.quat_sensor(kk), pos(:,1:kk-1), 2, 2,'none',true)
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
-        view([0,90])
+        %view([0,90])
         hold on
         scatter3(landmark_locations(1,:),landmark_locations(2,:),landmark_locations(3,:),'k')
         xlabel("X");

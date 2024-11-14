@@ -14,34 +14,36 @@ draw = true;
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_datasets/rover_3D_10Hz.mat');
+load ('../generated_datasets/rover_3D_100Hz.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y, z]'. 
-% For range-bearing-elevation, meas_vector = [range, bearing, elevation]', 
+% For range-bearing-elevation, meas_vector = [range_m, bearing_rad, elevation_rad]', 
 sensor_params.meas_model = 'range-bearing-elevation'; %[cartesian, range-bearing-elevation]
 sensor_params.HFOV = deg2rad(70);
 sensor_params.VFOV = deg2rad(30);
 sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
 sensor_params.detect_prob = 0.8;
-sensor_params.measurement_std = [0.2, 0.2]; 
-sensor_params.avg_num_clutter = 3;
+sensor_params.sensor_rate = 5;
+sensor_params.measurement_std = [0.02, 0.01, 0.01];  
+sensor_params.avg_num_clutter = 5;
 
-sensor_params.meas_area = sensor_params.HFOV * 0.5 * ...
-    (sensor_params.max_range - sensor_params.min_range)^2;
+sensor_params.meas_area = sphere_meas_vol(sensor_params.max_range,...
+    sensor_params.min_range, sensor_params.HFOV, sensor_params.VFOV);
 sensor_params.clutter_density = sensor_params.avg_num_clutter / ...
     sensor_params.meas_area;
 
-%% Define odometry configurations
-odom_params.motion_sigma = [0.5; 0.5; 0.2]; 
+%% Define odometry configurations 
+% Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
+odom_params.motion_sigma = [0.1; 0.1; 0.1; 0.03; 0.03; 0.03]; 
 
 %% Defind filter parameters
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
 filter_params.sensor.detect_prob = 0.8;
-filter_params.sensor.measurement_std = [0.2, 0.2];
-filter_params.sensor.avg_num_clutter = 1;
+filter_params.sensor.measurement_std = [0.02, 0.01, 0.01];
+filter_params.sensor.avg_num_clutter = 5;
 
 % Particle filter params
 filter_params.num_particle = 200;
@@ -51,7 +53,7 @@ filter_params.likelihood_method = 'single-cluster'; %['empty', 'single-feature, 
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % For 2D, cov_z, cov_phi and cov_theta = 0
 filter_params.motion_model = 'odometry'; % [odometry, random-walk, truth]
-filter_params.motion_sigma = [0.5; 0.5; 0.2];
+filter_params.motion_sigma = [0.1; 0.1; 0.1; 0.03; 0.03; 0.03];
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.1;             % Default intensity of GM component when birth
@@ -69,8 +71,10 @@ filter_params.inner_filter = 'ekf';
 filter_params.sensor.clutter_density = filter_params.sensor.avg_num_clutter / ...
     filter_params.sensor.meas_area;
 filter_params.sensor.R = diag(filter_params.sensor.measurement_std.^2);
-filter_params.birthGM_cov = diag([filter_params.birthGM_std, filter_params.birthGM_std].^2);
-filter_params.map_Q = diag([filter_params.map_std, filter_params.map_std].^2);
+filter_params.birthGM_cov = diag([filter_params.birthGM_std, ...
+    filter_params.birthGM_std, filter_params.birthGM_std].^2);
+filter_params.map_Q = diag([filter_params.map_std, filter_params.map_std,...
+    filter_params.map_std].^2);
 
 %% Setup struct to save datas
 simulation.sensor_params = sensor_params;
@@ -81,7 +85,7 @@ results = cell(num_run,1);
 file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
 for ii = 1:num_run
-    results{ii,1} = phd_slam1_2d_instance(dataset,sensor_params, odom_params, filter_params, draw);
+    results{ii,1} = phd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
 end
 
 simulation.result = results;
