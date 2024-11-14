@@ -8,7 +8,7 @@ clc;
 num_run = 1;
 
 % Visualization
-draw = true;
+draw = false;
 
 % add path to util functions. 
 addpath('../../util/')
@@ -28,6 +28,8 @@ sensor_params.detect_prob = 0.8;
 sensor_params.sensor_rate = 5;
 sensor_params.measurement_std = [0.02, 0.01, 0.01];  
 sensor_params.avg_num_clutter = 5;
+sensor_params.pos_body_sensor = dataset.pos_body_sensor;
+sensor_params.quat_body_sensor = dataset.quat_body_sensor;
 
 sensor_params.meas_area = sphere_meas_vol(sensor_params.max_range,...
     sensor_params.min_range, sensor_params.HFOV, sensor_params.VFOV);
@@ -36,7 +38,7 @@ sensor_params.clutter_density = sensor_params.avg_num_clutter / ...
 
 %% Define odometry configurations 
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
-odom_params.motion_sigma = [0.1; 0.1; 0.1; 0.03; 0.03; 0.03]; 
+odom_params.motion_sigma = [0.1; 0.1; 0; 0.01; 0.01; 0.03]; 
 
 %% Defind filter parameters
 % Sensor params exposed to filter

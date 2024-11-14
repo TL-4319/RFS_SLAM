@@ -18,8 +18,24 @@ draw = false;
 
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 50;
-num_landmark = 1000;
+num_landmark = 1500;
+min_dist_betwee_landmark = 0.0;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
+% Remove points that has xy coordinates too close together
+ii = 1;
+while ii < num_landmark
+    cur_xy = landmark_locations(ii,1:2);
+    
+    dist_to_other = landmark_locations(:,1:2);
+    dist_to_other(ii,:) = [];
+    dist_to_other = dist_to_other - cur_xy;
+    dist_to_other = (dist_to_other(:,1).^2 + dist_to_other(:,2).^2).^0.5;
+    ind_too_close = find(dist_to_other < min_dist_betwee_landmark);
+    landmark_locations(ind_too_close,:) = [];
+    num_landmark = num_landmark - size(ind_too_close,1);
+    ii = ii + 1;
+end
+
 landmark_locations(:,3) = (rand(num_landmark,1) - 0.5) * 0.3 ; % This aim to simulate planetary env where features are terrain based on ground
 landmark_locations = landmark_locations';
 
@@ -62,9 +78,9 @@ dataset.trans_vel_body = trans_vel_body;
 dataset.rot_vel_body = rot_vel_body;
 dataset.accel_body = acc_body;
 
-% Calculate sensor pose in world
+% Set sensor pose in robot frame
 dataset.pos_body_sensor = [1;0;-1.5];
-dataset.quat_body_sensor = quaternion([0, -20, 0],"eulerd","ZYX","frame");
+dataset.quat_body_sensor = quaternion([0, -25, 0],"eulerd","ZYX","frame");
 
 % Calculate sensor pose 
 dataset.pos_sensor = dataset.pos;
@@ -91,7 +107,7 @@ if draw
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
-        %view([0,90])
+        view([0,90])
         hold on
         scatter3(landmark_locations(1,:),landmark_locations(2,:),landmark_locations(3,:),'k')
         xlabel("X");
