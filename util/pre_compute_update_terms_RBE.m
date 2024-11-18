@@ -2,9 +2,10 @@ function [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE...
     (particle, GM_mu, GM_cov, sensor_params)
     num_GM = size(GM_mu,3);
     
-    temp_mu = vertcat(GM_mu, zeros(1,num_GM));
+    temp_mu = GM_mu;
+    
 
-    [~, pred_z, ~] = gen_meas_RBE_3D(particle.pos, particle.quat, temp_mu, sensor_params); 
+    [~, pred_z, ~, ~] = gen_meas_rbe_3D(particle.pos, particle.quat, temp_mu, sensor_params); 
     
     pred_z = pred_z(1:3,:);
     K = zeros(3,3,num_GM);

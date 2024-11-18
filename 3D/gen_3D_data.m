@@ -62,7 +62,7 @@ orientation_wp = quaternion([0,0,0; ...
 
 % Define ground speed. This can be constant or variable
 ground_speed_mps = 0.2;
-groundspeed = ones(1,size(waypoints,1)) * 1; groundspeed(1) = 0; %Initial zero velocity
+groundspeed = ones(1,size(waypoints,1)) * ground_speed_mps; groundspeed(1) = 0; %Initial zero velocity
 
 % Generate pose
 dt = 1/data_rate_hz;

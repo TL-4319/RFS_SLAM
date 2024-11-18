@@ -7,10 +7,11 @@ function [pos_diff_in_body, rbe_in_body, is_in_FOV, PD_vec_multiplier] = check_i
     pos_diff_in_body = rotateframe(quat, pos_diff');
     pos_diff_in_body = pos_diff_in_body';
     landmark_bearing_from_sensor = atan2(pos_diff_in_body(2,:),pos_diff_in_body(1,:));
-
+    
     % Calc elevation from sensor
-    landmark_elevation_from_sensor = atan2(pos_diff_in_body(3,:),pos_diff_in_body(1,:));
-
+    r = (pos_diff_in_body(2,:).^2 + pos_diff_in_body(1,:).^2).^0.5;
+    landmark_elevation_from_sensor = atan2(pos_diff_in_body(3,:),r);
+    
     % If VFOV just has 1 element, use constant VFOV. 
     % Multiple VFOV can be used to simulate Lissajous pattern
     if size(sensor.VFOV,1) == 1 

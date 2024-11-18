@@ -24,10 +24,10 @@ sensor_params.HFOV = deg2rad(70);
 sensor_params.VFOV = deg2rad(30);
 sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
-sensor_params.detect_prob = 0.8;
+sensor_params.detect_prob = 1;
 sensor_params.sensor_rate = 5;
-sensor_params.measurement_std = [0.02, 0.01, 0.01];  
-sensor_params.avg_num_clutter = 5;
+sensor_params.measurement_std = [0.0, 0.0, 0.0];  
+sensor_params.avg_num_clutter = 0;
 sensor_params.pos_body_sensor = dataset.pos_body_sensor;
 sensor_params.quat_body_sensor = dataset.quat_body_sensor;
 
@@ -44,7 +44,7 @@ odom_params.motion_sigma = [0.1; 0.1; 0; 0.01; 0.01; 0.03];
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
 filter_params.sensor.detect_prob = 0.8;
-filter_params.sensor.measurement_std = [0.02, 0.001, 0.001];
+filter_params.sensor.measurement_std = [0.1, 0.01, 0.01];
 filter_params.sensor.avg_num_clutter = 2;
 
 % Particle filter params

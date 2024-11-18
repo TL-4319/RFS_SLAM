@@ -16,9 +16,8 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     if draw
         fig1 = figure(1);
         title ("Sim world")
-        fig1.Position = [1,1,1000,1000];
+        fig1.Position = [1,1,2000,1000];
 
-        frame = cell(size(time_vec,2)-1,1);
     end
 
     %% Prepare truth data struct
@@ -39,7 +38,7 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     sensor_time_ind = 1;
     for kk = 1:size(time_vec,2)
         if abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5
-            [cur_meas, ~,landmark_in_FOV] = gen_meas_rbe_3D(truth.pos(:,kk),...
+            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_rbe_3D(truth.pos(:,kk),...
                 truth.quat(kk,:),dataset.landmark_locations, sensor_params);
             meas_table{sensor_time_ind,:} = cur_meas;
             if sensor_time_ind == 1
@@ -108,6 +107,12 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
 
     %% Run simulation
     sensor_time_ind = 2;
+
+    % obj = VideoWriter("myvideo","Motion JPEG AVI");
+    % obj.Quality = 100;
+    % obj.FrameRate = 5;
+    % open(obj);
+
     for kk = 2:size(time_vec,2) 
         %% Get current measurements and reproject for viz if measurement avail
         meas_avail = abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5;
@@ -116,7 +121,10 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
             cur_meas = meas_table{sensor_time_ind,1};
             meas_reprojected = reproject_meas(truth.pos(:,kk), truth.quat(kk,:),...
                 cur_meas, sensor_params);
-            sensor_time_ind = sensor_time_ind + 1;
+
+            if sensor_time_ind < size(sensor_time_vec,2)
+                sensor_time_ind = sensor_time_ind + 1;
+            end
         end
 
         out_loop_timer = tic;
@@ -159,8 +167,8 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
                 %% GM component checking step
                 % Check for GM in FOV
                 num_GM_prev = size(particles(1,par_ind).gm_mu,2);
-                gm_mu_temp = vertcat(particles(1,par_ind).gm_mu,zeros(1,num_GM_prev));
-                [~,GM_in_FOV] = check_in_FOV_3D(gm_mu_temp, ...
+                gm_mu_temp = particles(1,par_ind).gm_mu;
+                [~,~,GM_in_FOV,~] = check_in_FOV_3D(gm_mu_temp, ...
                     particles(1,par_ind).pos, particles(1,par_ind).quat, sensor_params);
     
                  % Extract GM components not in FOV. No changes are made to them
@@ -257,22 +265,13 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         title(title_str)
         %view(0,90)
         drawnow
-        frame{kk-1} = getframe(gcf);
+        %writeVideo(obj,getframe(gcf));
         end %draw
         
 
     end %kk = 2:size(time_vec,2)
     
-    % if draw
-    %     % Write video
-    %     obj = VideoWriter("myvideo");
-    %     obj.FrameRate = 20;
-    %     open(obj);
-    %     for i=1:length(frame)
-    %         writeVideo(obj,frame{i})
-    %     end
-    %     obj.close();
-    % end
+    % obj.close();
     % End simulation
     results.truth = truth;
     results.filter_est = est;
