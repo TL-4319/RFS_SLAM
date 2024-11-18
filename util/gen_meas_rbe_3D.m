@@ -4,8 +4,7 @@ function [meas, perfect_meas,landmark_in_FOV, PD_vec_multi] = ...
     % Generate range bearing elevation measurements (noisy and perfect) given current pose and map 
     
     %% Sensor pose in world frame
-    sensor_pos = pos + transpose(rotatepoint(quat,sensor_params.pos_body_sensor'));
-    sensor_quat = quatmultiply(sensor_params.quat_body_sensor, quat);
+    [sensor_pos, sensor_quat] = get_sensor_pose(pos, quat, sensor_params);
 
     %% FOV Check
     % Return true landmark position within FOV in world frame
@@ -38,7 +37,7 @@ function [meas, perfect_meas,landmark_in_FOV, PD_vec_multi] = ...
     clutter_detection_z_world = (rand(1,num_clutter) - 0.5) * 0.1;
     clutter_diff_world = clutter_detection_z_world - sensor_pos(3);
     sensor_euler = quat2eul(sensor_quat, "ZYX");
-    clutter_el_in_world = sensor_euler(2) + clutter_elevation;
+    clutter_el_in_world = sensor_euler(2) - clutter_elevation;
     clutter_range = clutter_diff_world ./ abs(sin(clutter_el_in_world));
 
     clutter_meas = vertcat(clutter_range, clutter_bearing, clutter_elevation);

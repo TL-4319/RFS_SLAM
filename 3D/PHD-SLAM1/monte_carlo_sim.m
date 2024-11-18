@@ -8,13 +8,13 @@ clc;
 num_run = 1;
 
 % Visualization
-draw = false;
+draw = true;
 
 % add path to util functions. 
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_datasets/rover_3D_100Hz.mat');
+load ('../generated_datasets/rover_3D_20Hz.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y, z]'. 
@@ -44,17 +44,17 @@ odom_params.motion_sigma = [0.1; 0.1; 0; 0.01; 0.01; 0.03];
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
 filter_params.sensor.detect_prob = 0.8;
-filter_params.sensor.measurement_std = [0.02, 0.01, 0.01];
-filter_params.sensor.avg_num_clutter = 5;
+filter_params.sensor.measurement_std = [0.02, 0.001, 0.001];
+filter_params.sensor.avg_num_clutter = 2;
 
 % Particle filter params
-filter_params.num_particle = 200;
+filter_params.num_particle = 1;
 filter_params.resample_threshold = 0.4; % Percentage of num_particle for resample to trigger
 filter_params.likelihood_method = 'single-cluster'; %['empty', 'single-feature, 'single-cluster']
 
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % For 2D, cov_z, cov_phi and cov_theta = 0
-filter_params.motion_model = 'odometry'; % [odometry, random-walk, truth]
+filter_params.motion_model = 'truth'; % [odometry, random-walk, truth]
 filter_params.motion_sigma = [0.1; 0.1; 0.1; 0.03; 0.03; 0.03];
 
 % Map PHD config

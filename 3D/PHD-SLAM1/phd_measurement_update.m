@@ -10,7 +10,7 @@ phd_measurement_update (particle, GM_mu, GM_cov, GM_inten, meas, filter_params)
         num_GM = size(GM_inten_prev,2);
 
         % Pre compute measurement matrices
-        [pred_z, K, S, P, Sinv] = pre_compute_update_terms_cartesian_2D(particle, ...
+        [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE(particle, ...
             GM_mu, GM_cov, filter_params.sensor);
         
         % Update GM components as misdetected

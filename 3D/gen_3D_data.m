@@ -18,8 +18,8 @@ draw = false;
 
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 50;
-num_landmark = 1500;
-min_dist_betwee_landmark = 0.0;
+num_landmark = 2000;
+min_dist_betwee_landmark = 0.3;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 % Remove points that has xy coordinates too close together
 ii = 1;
@@ -43,7 +43,7 @@ landmark_locations = landmark_locations';
 % This is equivalent to the sampling rate of the fastest available sensor
 % you want to simulate
 
-data_rate_hz = 100; %
+data_rate_hz = 20; %
 
 %% Define trajectory
 % Generate trajectory - EDIT HERE TO CHANGE ROBOT PATH
