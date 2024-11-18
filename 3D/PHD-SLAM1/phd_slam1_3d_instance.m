@@ -1,4 +1,4 @@
-function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
     rng(420)
     time_vec = dataset.time_vec;
@@ -38,8 +38,12 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     sensor_time_ind = 1;
     for kk = 1:size(time_vec,2)
         if abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5
-            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_rbe_3D(truth.pos(:,kk),...
-                truth.quat(kk,:),dataset.landmark_locations, sensor_params);
+            % Sensor pose
+            [sensor_pos, sensor_quat] = ...
+                get_sensor_pose(truth.pos(:,kk), truth.quat(kk,:), sensor_params);
+
+            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_rbe_3D(sensor_pos,...
+                sensor_quat,dataset.landmark_locations, sensor_params);
             meas_table{sensor_time_ind,:} = cur_meas;
             if sensor_time_ind == 1
                 truth.cummulative_landmark_in_FOV{sensor_time_ind,1} = landmark_in_FOV;
@@ -92,11 +96,14 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
     %% Initialize filter
     if strcmp(sensor_params.meas_model,'cartesian')
         cur_meas = meas_table{1,1};
-
-        meas_world_frame = reproject_meas(truth.pos(:,1),truth.quat(1,:),cur_meas, sensor_params);
+        % Calc sensor pose in world frame
+        [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,1), truth.quat(1,:), sensor_params);
+        meas_world_frame = reproject_meas(sensor_pos,sensor_quat,cur_meas, sensor_params);
     elseif strcmp(sensor_params.meas_model,'range-bearing-elevation')
         cur_meas = meas_table{1,1};
-        meas_world_frame = reproject_meas(truth.pos(:,1),truth.quat(1,:), cur_meas, sensor_params);
+        % Calc sensor pose in world frame
+        [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,1), truth.quat(1,:), sensor_params);
+        meas_world_frame = reproject_meas(sensor_pos,sensor_quat, cur_meas, sensor_params);
     else
         error_msg = strcat(sensor_params.meas_model, " measurement model is not supported");
         error(error_msg);
@@ -119,7 +126,9 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         
         if meas_avail
             cur_meas = meas_table{sensor_time_ind,1};
-            meas_reprojected = reproject_meas(truth.pos(:,kk), truth.quat(kk,:),...
+            [sensor_pos, sensor_quat] = get_sensor_pose(particles(1,par_ind).pos,...
+                    particles(1,par_ind).quat,sensor_params);
+            meas_reprojected = reproject_meas(sensor_pos, sensor_quat,...
                 cur_meas, sensor_params);
 
             if sensor_time_ind < size(sensor_time_vec,2)
@@ -160,16 +169,18 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
             particles(1,par_ind).pos = cur_pos;
             particles(1,par_ind).quat = cur_quat;
             
-            if false
-            %if meas_avail
+            %if false
+            if meas_avail
                 %PF meas update if measurement available
 
                 %% GM component checking step
                 % Check for GM in FOV
                 num_GM_prev = size(particles(1,par_ind).gm_mu,2);
                 gm_mu_temp = particles(1,par_ind).gm_mu;
+                [sensor_pos, sensor_quat] = get_sensor_pose(particles(1,par_ind).pos,...
+                    particles(1,par_ind).quat,sensor_params);
                 [~,~,GM_in_FOV,~] = check_in_FOV_3D(gm_mu_temp, ...
-                    particles(1,par_ind).pos, particles(1,par_ind).quat, sensor_params);
+                    sensor_pos, sensor_quat, sensor_params);
     
                  % Extract GM components not in FOV. No changes are made to them
                 GM_out_FOV = ~GM_in_FOV;

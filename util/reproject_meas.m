@@ -1,11 +1,8 @@
-function meas_in_world = reproject_meas (pos, quat, meas, sensor_params)
+function meas_in_world = reproject_meas (sensor_pos, sensor_quat, meas, sensor_params)
     if size(meas,2) == 0
         meas_in_world = [];
         return
     end
-
-    % Calc sensor pose in world frame
-    [sensor_pos, sensor_quat] = get_sensor_pose(pos, quat, sensor_params);
 
     if strcmp(sensor_params.meas_model,'cartesian')
         % Reproject measurements into world frame

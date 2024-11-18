@@ -1,10 +1,7 @@
 function [meas, perfect_meas,landmark_in_FOV, PD_vec_multi] = ...
-    gen_meas_rbe_3D(pos, quat, landmark, sensor_params)
+    gen_meas_rbe_3D(sensor_pos, sensor_quat, landmark, sensor_params)
     % Created by Tuan Luong - 2024/11/14
     % Generate range bearing elevation measurements (noisy and perfect) given current pose and map 
-    
-    %% Sensor pose in world frame
-    [sensor_pos, sensor_quat] = get_sensor_pose(pos, quat, sensor_params);
 
     %% FOV Check
     % Return true landmark position within FOV in world frame
