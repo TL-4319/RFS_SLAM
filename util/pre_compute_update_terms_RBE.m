@@ -13,7 +13,8 @@ function [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE...
     P = K;
     S = K;
     Sinv = K;
-    H_3d = quat2rot(compact(particle.quat),"frame");
+
+    H = compute_H_rbe(sensor_pos, sensor_quat, temp_mu, sensor_params);
 
     for jj = 1:num_GM
         S(:,:,jj) = H_3d * GM_cov(:,:,jj) * H_3d' + sensor_params.R;
