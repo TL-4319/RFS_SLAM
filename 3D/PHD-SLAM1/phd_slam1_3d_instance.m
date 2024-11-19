@@ -16,7 +16,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     if draw
         fig1 = figure(1);
         title ("Sim world")
-        fig1.Position = [1,1,2000,1000];
+        fig1.Position = [1,1,1000,1000];
 
     end
 
@@ -115,10 +115,10 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     %% Run simulation
     sensor_time_ind = 2;
 
-    % obj = VideoWriter("myvideo","Motion JPEG AVI");
-    % obj.Quality = 100;
-    % obj.FrameRate = 5;
-    % open(obj);
+     obj = VideoWriter("myvideo","Motion JPEG AVI");
+     obj.Quality = 100;
+     obj.FrameRate = 5;
+     open(obj);
 
     for kk = 2:size(time_vec,2) 
         %% Get current measurements and reproject for viz if measurement avail
@@ -229,7 +229,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map{kk,1} = map_est;
+        est.map{kk,1} = map_est_struct;
 
         % Adaptive birth PHD (Lin Gao's implementation)
         particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
@@ -249,7 +249,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         draw_trajectory(truth.pos(:,kk), truth.quat(kk,:), truth.pos(:,1:kk),2, 2,'k',false);
         draw_trajectory(sensor_pos, sensor_quat, truth.pos(:,1:kk),2, 2,'none',true);
         %draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
-        %draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 4, 2, 'r',true);
+        draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 2, 2, 'r',true);
         hold on
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
@@ -257,35 +257,36 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         scatter3(truth.cummulative_landmark_in_FOV{end,1}(1,:),...
             truth.cummulative_landmark_in_FOV{end,1}(2,:),...
             truth.cummulative_landmark_in_FOV{end,1}(3,:),...
-            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 50,'k')
+            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 10,'k')
         
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
-            ones(size(meas_reprojected,2),1) * 50,'b*');
+            ones(size(meas_reprojected,2),1) * 10,'b*');
         
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
-            ones(size(map_est,2),1) * 50,'r+')
+            ones(size(map_est,2),1) * 10,'r+')
 
-        plot_3D_phd(map_est_struct, 200, 0.2, 1, 2)
+        plot_3D_phd(map_est_struct, 100, 0.2, 1, 2)
         xlabel("X (m)");
         ylabel("Y (m)");
         zlabel("Z (m)");
         axis equal;
         xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
         ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
-        zlim([-2 5])
+        zlim([-2 10])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
         
         colorbar
         title(title_str)
         view(0,90)
         drawnow
-        %writeVideo(obj,getframe(gcf));
+        savefig(fig1, "test.fig")
+        writeVideo(obj,getframe(openfig("test.fig","invisible")));
         end %draw
         
 
     end %kk = 2:size(time_vec,2)
     
-    % obj.close();
+    obj.close();
     % End simulation
     results.truth = truth;
     results.filter_est = est;
