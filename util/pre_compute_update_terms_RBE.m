@@ -14,7 +14,7 @@ function [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE...
     S = K;
     Sinv = K;
 
-    H = compute_H_rbe(sensor_pos, sensor_quat, temp_mu, sensor_params);
+    H = compute_H_rbe(sensor_pos, sensor_quat, temp_mu);
 
     for jj = 1:num_GM
         S(:,:,jj) = H(:,:,jj) * GM_cov(:,:,jj) * H(:,:,jj)' + sensor_params.R;
