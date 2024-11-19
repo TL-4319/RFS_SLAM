@@ -1,12 +1,12 @@
 function [pos_diff_in_body, rbe_in_body, is_in_FOV, PD_vec_multiplier] = ...
     check_in_FOV_3D(landmark, sensor_pos, sensor_quat, sensor)
-    % Range calc
-    pos_diff = landmark - sensor_pos;
-    range = vecnorm(pos_diff,2,1);
+
+    pos_diff_in_body = calc_local_pos(sensor_pos, sensor_quat, landmark);
+
+    % Range calc 
+    range = vecnorm(pos_diff_in_body,2,1);
     
     % Calc bearing from sensor
-    pos_diff_in_body = rotateframe(sensor_quat, pos_diff');
-    pos_diff_in_body = pos_diff_in_body';
     landmark_bearing_from_sensor = atan2(pos_diff_in_body(2,:),pos_diff_in_body(1,:));
     
     % Calc elevation from sensor

@@ -232,7 +232,8 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         est.map{kk,1} = map_est;
 
         % Adaptive birth PHD (Lin Gao's implementation)
-        particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat, cur_meas, map_est_struct, filter_params, particles);
+        particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
+            cur_meas, map_est_struct, filter_params, particles);
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
@@ -263,18 +264,20 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
             ones(size(map_est,2),1) * 50,'r+')
+
+        plot_3D_phd(map_est_struct, 200, 0.2, 1, 2)
         xlabel("X (m)");
         ylabel("Y (m)");
         zlabel("Z (m)");
         axis equal;
         xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
         ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
-        zlim([-2 2])
+        zlim([-2 5])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
-        %plot_2D_phd(map_est_struct,200,0,1)
+        
         colorbar
         title(title_str)
-        %view(0,90)
+        view(0,90)
         drawnow
         %writeVideo(obj,getframe(gcf));
         end %draw

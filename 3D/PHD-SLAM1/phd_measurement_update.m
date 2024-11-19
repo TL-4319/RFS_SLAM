@@ -17,8 +17,6 @@ phd_measurement_update (particle, GM_mu, GM_cov, GM_inten, meas, filter_params)
         GM_inten = (1 - filter_params.sensor.detect_prob) * GM_inten_prev;
 
         % Update GM components as detected
-        meas = meas(1:2,:); % Only get the 2D measurement
-        
         likelipz = zeros(1,size(meas,2));
         for zz = 1:size(meas,2)
             tau = zeros(1,num_GM);

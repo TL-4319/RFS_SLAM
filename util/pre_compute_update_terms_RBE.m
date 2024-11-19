@@ -17,13 +17,13 @@ function [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE...
     H = compute_H_rbe(sensor_pos, sensor_quat, temp_mu, sensor_params);
 
     for jj = 1:num_GM
-        S(:,:,jj) = H_3d * GM_cov(:,:,jj) * H_3d' + sensor_params.R;
+        S(:,:,jj) = H(:,:,jj) * GM_cov(:,:,jj) * H(:,:,jj)' + sensor_params.R;
         S(:,:,jj) = (S(:,:,jj) + S(:,:,jj)')/2; % Avoid numerical instability
         Sinv(:,:,jj) = pinv(S(:,:,jj));
-        K(:,:,jj) = GM_cov(:,:,jj) * H' * Sinv(:,:,jj);
+        K(:,:,jj) = GM_cov(:,:,jj) * H(:,:,jj)' * Sinv(:,:,jj);
 
         % Cov update via Joeseph form
-        temp = (eye(3) - K(:,:,jj) * H);
+        temp = (eye(3) - K(:,:,jj) * H(:,:,jj));
         P(:,:,jj) = temp * GM_cov(:,:,jj) * temp' + K(:,:,jj) * sensor_params.R * K(:,:,jj)';
     end
 
