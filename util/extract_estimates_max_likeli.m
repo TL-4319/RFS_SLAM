@@ -17,8 +17,11 @@ function [pose_est, map_est] = extract_estimates_max_likeli (particle, filter_pa
     
     % Find expected number of landmark
     map_est.exp_num_landmark = round(sum(max_likeli_gm_inten));
-    %[~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
-    [~, ID_map] = find(max_likeli_gm_inten > filter_params.GM_inten_thres);
+    if strcmp(filter_params.map_est_method,'exp')
+        [~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
+    elseif strcmp(filter_params.map_est_method,'thres')
+        [~, ID_map] = find(max_likeli_gm_inten > filter_params.GM_inten_thres);
+    end
     map_est.feature_pos = max_likeli_gm_mu(:,ID_map);
     map_est.max_likeli_gm_mu = max_likeli_gm_mu;
     map_est.max_likeli_gm_cov = max_likeli_gm_cov;

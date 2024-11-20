@@ -67,6 +67,7 @@ filter_params.pruning_thres = 10^-3;
 filter_params.merge_dist = 0.3;
 filter_params.num_GM_cap = 5000;
 filter_params.inner_filter = 'ekf';
+filter_params.map_est_method = 'exp';           % Method to extract map est. 'exp' or 'thres'
 
 % NO INPUT REQUIRED for the rest of the section
 % Calculate corresponding matrices
