@@ -21,7 +21,7 @@ detect_prob_vec, meas, filter_params)
         meas_likelihood = calc_meas_likelihood(meas, pred_z, S, Sinv);
 
         % Pre compute for elementary symmetric function
-        XI_vals = zeros(1,num_meas); % input to esf
+        XI_vals = zeros(num_meas,1); % input to esf
         for zz = 1:num_meas
             XI_vals(zz) = (detect_prob_vec .* GM_inten) * meas_likelihood(:,zz) ...
                 / filter_params.sensor.clutter_density;
@@ -31,7 +31,7 @@ detect_prob_vec, meas, filter_params)
         esfvals_D = zeros(num_meas, num_meas); %calculate esf with each observation index removed one-by-one
         
         for zz = 1:num_meas
-            esfvals_D(:,zz) = esf([XI_vals(1:zz-1),XI_vals(zz+1:num_meas)]);
+            esfvals_D(:,zz) = esf([XI_vals(1:zz-1);XI_vals(zz+1:num_meas)]);
         end
 
         % Pre calc for upsilons

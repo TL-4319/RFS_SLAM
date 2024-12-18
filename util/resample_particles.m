@@ -18,11 +18,7 @@ function [particle, num_effective_particle] = resample_particles (prev_particle,
         % Resmaple and generate new particles
         resample_ind = low_variance_resample(normalize_likeli_vec, size(particle,2));
         for par_ind = 1:filter.num_particle
-            particle(1,par_ind).pos = prev_particle(1,resample_ind(1,par_ind)).pos;
-            particle(1,par_ind).quat = prev_particle(1,resample_ind(1,par_ind)).quat;
-            particle(1,par_ind).gm_mu = prev_particle(1,resample_ind(1,par_ind)).gm_mu;
-            particle(1,par_ind).gm_inten = prev_particle(1,resample_ind(1,par_ind)).gm_inten;
-            particle(1,par_ind).gm_cov = prev_particle(1,resample_ind(1,par_ind)).gm_cov;
+            particle(1,par_ind) = prev_particle(1,resample_ind(1,par_ind));
             particle(1,par_ind).w = 1/size(particle,2);
         end
 

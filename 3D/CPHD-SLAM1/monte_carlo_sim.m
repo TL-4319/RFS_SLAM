@@ -59,8 +59,8 @@ filter_params.motion_sigma = [0.1; 0.1; 0.0; 0.03; 0.03; 0.03];
 
 % Map CPHD config
 filter_params.max_card = 100;
-filter_params.birthGM_intensity = 0.3;             % Default intensity of GM component when birth
-filter_params.birthGM_std = 0.5;                  % Default standard deviation in position of GM component when birth
+filter_params.birthGM_intensity = 0.01;             % Default intensity of GM component when birth
+filter_params.birthGM_std = 1;                  % Default standard deviation in position of GM component when birth
 filter_params.map_std = 0.1;
 filter_params.adaptive_birth_dist_thres = 0.2;
 filter_params.GM_inten_thres = 0.5;                % Threshold to use a component for importance weight calc and plotting
@@ -68,7 +68,7 @@ filter_params.pruning_thres = 10^-3;
 filter_params.merge_dist = 0.3;
 filter_params.num_GM_cap = 5000;
 filter_params.inner_filter = 'ekf';
-filter_params.map_est_method = 'exp';           % Method to extract map est. 'exp' or 'thres'
+filter_params.map_est_method = 'cphd';           % Method to extract map est. 'exp' or 'thres'
 
 % NO INPUT REQUIRED for the rest of the section
 % Calculate corresponding matrices

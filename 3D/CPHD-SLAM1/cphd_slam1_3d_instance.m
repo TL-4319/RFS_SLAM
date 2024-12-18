@@ -238,7 +238,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
                     GM_cov, GM_inten, filter_params.pruning_thres, ...
                     filter_params.merge_dist, filter_params.num_GM_cap);
     
-                    %% Parse updated GM and include out of FOV components
+                    %% Parse updated GM and cardinality distribution
                     particles(1,par_ind).gm_mu = GM_mu;
                     particles(1,par_ind).gm_inten = GM_inten;
                     particles(1,par_ind).gm_cov = GM_cov;
@@ -257,10 +257,12 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
         est.map{kk,1} = map_est_struct;
-
-        % Adaptive birth CPHD (modified Lin Gao's implementation)
-        particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
-            cur_meas, map_est_struct, filter_params, particles);
+    
+        if meas_avail
+            % Adaptive birth CPHD (modified Lin Gao's implementation)
+            particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
+                cur_meas, map_est_struct, filter_params, particles);
+        end
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
@@ -288,9 +290,10 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
             ones(size(meas_reprojected,2),1) * 50,'b*');
-        
+        if size(map_est,2) > 0
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
             ones(size(map_est,2),1) * 10,'r+')
+        end
 
         %plot_3D_phd(map_est_struct, 100, 0.2, 1, 2)
         xlabel("X (m)");
