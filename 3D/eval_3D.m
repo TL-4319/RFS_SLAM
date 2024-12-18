@@ -1,5 +1,5 @@
 close all;
-clear; 
+%clear; 
 clc;
 
 addpath('../util/')
@@ -11,8 +11,51 @@ load (strcat(location,file));
 
 
 %% 
-time_vec = simulation.result{1,1}.time_vec;
+time_vec = simulation.truth.time_vec;
 dt = time_vec(2) - time_vec(1);
+
+% Pre allocate traj metrics
+slam_pos_error = zeros(3,size(simulation.truth.pos,2));
+slam_eul_error = slam_pos_error;
+odom_pos_error = slam_pos_error;
+odom_euler_error = slam_pos_error;
+
+% Preallocate mapping error metrics
+true_card = zeros(1, size(simulation.truth.cummulative_landmark_in_FOV,1));
+for ii = 1:size(simulation.truth.cummulative_landmark_in_FOV,1)
+    true_card(ii) = size(simulation.truth.cummulative_landmark_in_FOV{ii,1},2);
+end
+
+est_card = zeros(size(simulation.result,1), size(simulation.truth.cummulative_landmark_in_FOV,1));
+ospa = est_card;
+cola = est_card;
+
+
+% Iterate through sim results to find avg errors
+for ii = 1:size(simulation.result,1)
+    if ii == 1
+        slam_pos_error = abs(simulation.truth.pos -...
+            simulation.result{ii,1}.filter_est.pos);
+        odom_pos_error = abs(simulation.truth.pos -...
+            simulation.result{ii,1}.odom_est.pos);
+
+    else
+        slam_pos_error = ((slam_pos_error * (ii-1)) + abs(simulation.truth.pos -...
+            simulation.result{ii,1}.filter_est.pos))/ii;
+        odom_pos_error = ((slam_pos_error * (ii-1)) + abs(simulation.truth.pos -...
+            simulation.result{ii,1}.odom_est.pos))/ii;
+    end
+
+    for kk = 2:size(true_card,2)
+        est_card(ii,kk) = simulation.result{ii,1}.filter_est.map_est{kk,1}.exp_num_landmark;
+    end
+
+end
+
+avg_card = mean(est_card,1);
+std_card = std(est_card,1);
+
+plot(true_card);
 
 % Position 
 est_pos = simulation.result{1,1}.filter_est.pos;

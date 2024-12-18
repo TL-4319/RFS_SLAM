@@ -3,10 +3,10 @@ clear;
 clc;
 
 % Define number of MC runs
-num_run = 1;
+num_run = 100;
 
 % Visualization
-draw = true;
+draw = false;
 
 % add path to util functions. 
 addpath('../../util/')
@@ -78,6 +78,7 @@ filter_params.map_Q = diag([filter_params.map_std, filter_params.map_std,...
     filter_params.map_std].^2);
 
 %% Setup struct to save datas
+simulation.type = "PHD-SLAM1";
 simulation.sensor_params = sensor_params;
 simulation.filter_params = filter_params;
 simulation.odom_params = odom_params;
@@ -86,10 +87,17 @@ results = cell(num_run,1);
 file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
 for ii = 1:num_run
-    results{ii,1} = phd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
+    disp(ii)
+    [results{ii,1}, truth] = phd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
+    if mod(ii,10)==0
+        % Save every 10 run
+        simulation.result = results;
+        save(file_name,"simulation",'-v7.3');
+    end
+    if ii == 1
+        simulation.truth = truth; % Only need one copy of truth data
+    end
 end
 
 simulation.result = results;
-
-
-save(file_name,"simulation");
+save(file_name,"simulation",'-v7.3');

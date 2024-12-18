@@ -1,6 +1,6 @@
-function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
-    rng(420)
+    %rng(420)
     time_vec = dataset.time_vec;
     dt = time_vec(2) - time_vec(1);
 
@@ -90,7 +90,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
 
     est.pos = truth.pos;
     est.quat = truth.quat;
-    est.map_est = cell(size(time_vec,2),1);
+    est.map_est = cell(size(sensor_time_vec,2),1);
     est.compute_time = zeros(size(time_vec,2),1);
     
     %% Initialize filter
@@ -114,6 +114,13 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
 
     %% Run simulation
     sensor_time_ind = 2;
+
+    if draw
+        obj = VideoWriter("myvideo","Motion JPEG AVI");
+        obj.Quality = 100;
+        obj.FrameRate = 5;
+        open(obj);
+    end
 
     for kk = 2:size(time_vec,2) 
         %% Get current measurements and reproject for viz if measurement avail
@@ -224,7 +231,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map{kk,1} = map_est_struct;
+        est.map_est{sensor_time_ind,1} = map_est_struct;
 
         % Adaptive birth PHD (Lin Gao's implementation)
         particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
@@ -281,12 +288,17 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         
 
     end %kk = 2:size(time_vec,2)
-    
+
+    if draw
+        obj.close();
+    end
+
     % End simulation
-    results.truth = truth;
+    results.meas_table = meas_table;
     results.filter_est = est;
     results.odom_est = odom;
-    results.time_vec = time_vec;
+    truth.sensor_time_vec = sensor_time_vec;
+    truth.time_vec = time_vec;
 
 
 end
