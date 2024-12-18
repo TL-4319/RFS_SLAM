@@ -6,8 +6,9 @@ function [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE...
     
     % Sensor pos
     [sensor_pos, sensor_quat] = get_sensor_pose(particle.pos, particle.quat, sensor_params);
-
-    [~, pred_z, ~, ~] = gen_meas_rbe_3D(sensor_pos, sensor_quat, temp_mu, sensor_params); 
+    
+    pred_z = zeros(3,num_GM);
+    [pred_z(1,:), pred_z(2,:), pred_z(3,:)] = calc_rbe_in_body(GM_mu, sensor_pos, sensor_quat);
     
     K = zeros(3,3,num_GM);
     P = K;
@@ -15,6 +16,8 @@ function [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE...
     Sinv = K;
 
     H = compute_H_rbe(sensor_pos, sensor_quat, temp_mu);
+    
+    
 
     for jj = 1:num_GM
         S(:,:,jj) = H(:,:,jj) * GM_cov(:,:,jj) * H(:,:,jj)' + sensor_params.R;

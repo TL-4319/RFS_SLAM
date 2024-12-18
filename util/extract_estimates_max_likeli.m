@@ -14,13 +14,19 @@ function [pose_est, map_est] = extract_estimates_max_likeli (particle, filter_pa
     max_likeli_gm_mu = particle(1,max_w_particle_ind).gm_mu;
     max_likeli_gm_inten = particle(1,max_w_particle_ind).gm_inten;
     max_likeli_gm_cov = particle(1,max_w_particle_ind).gm_cov; % Used for visualization
+    max_likeli_card_dist = particle(1,max_w_particle_ind).card_dist;
     
     % Find expected number of landmark
-    map_est.exp_num_landmark = round(sum(max_likeli_gm_inten));
     if strcmp(filter_params.map_est_method,'exp')
+        map_est.exp_num_landmark = round(sum(max_likeli_gm_inten));
         [~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
     elseif strcmp(filter_params.map_est_method,'thres')
         [~, ID_map] = find(max_likeli_gm_inten > filter_params.GM_inten_thres);
+        map_est.exp_num_landmark = size(any(ID_map),1);
+    elseif strcmp(filter_params.map_est_method,'cphd')
+        [~,max_card_ind] = max(max_likeli_card_dist);
+        map_est.exp_num_landmark = max_card_ind - 1;
+        [~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
     end
     map_est.feature_pos = max_likeli_gm_mu(:,ID_map);
     map_est.max_likeli_gm_mu = max_likeli_gm_mu;

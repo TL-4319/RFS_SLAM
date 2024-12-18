@@ -109,11 +109,16 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         error(error_msg);
     end
 
-    particles = init_phd1_particles_3D(truth.pos(:,1),...
+    particles = init_cphd1_particles_3D(truth.pos(:,1),...
         truth.quat(1,:),meas_world_frame,filter_params);
 
     %% Run simulation
     sensor_time_ind = 2;
+
+     % obj = VideoWriter("myvideo","Motion JPEG AVI");
+     % obj.Quality = 100;
+     % obj.FrameRate = 5;
+     % open(obj);
 
     for kk = 2:size(time_vec,2) 
         %% Get current measurements and reproject for viz if measurement avail
@@ -121,8 +126,8 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         
         if meas_avail
             cur_meas = meas_table{sensor_time_ind,1};
-            [sensor_pos, sensor_quat] = get_sensor_pose(particles(1,par_ind).pos,...
-                    particles(1,par_ind).quat,sensor_params);
+            [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,kk),...
+                    truth.quat(kk),sensor_params);
             meas_reprojected = reproject_meas(sensor_pos, sensor_quat,...
                 cur_meas, sensor_params);
 
@@ -167,6 +172,13 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
             %if false
             if meas_avail
                 %PF meas update if measurement available
+                % In CPHD filter while it is possible to split the PHD and
+                % card distribution, it is not trivial. This implementation
+                % apply the CPHD over the entire per-particle map PHD,
+                % treating out-of-FOV compoenent as having 0% detect prob.
+
+                % Further research and implementation of CPHD splitting and
+                % merging might lower compute time.
 
                 %% GM component checking step
                 % Check for GM in FOV
@@ -176,41 +188,61 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
                     particles(1,par_ind).quat,sensor_params);
                 [GM_in_FOV,~] = check_in_FOV_3D(gm_mu_temp, ...
                     sensor_pos, sensor_quat, sensor_params);
-    
-                 % Extract GM components not in FOV. No changes are made to them
+                
+                % Construct statistics for map GMs
+                detect_prob_vec = filter_params.sensor.detect_prob * GM_in_FOV;
+                
+                 % Extract GM components not in FOV. No changes are made to
+                 % them. This is not used in CPHD
                 GM_out_FOV = ~GM_in_FOV;
                 GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
                 GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
                 GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
         
-                % Extract GM components in FOV. These are used during update
+                % Extract GM components in FOV. These are used during
+                % update. Not used in CPHD 
                 % Predict 
                 GM_mu_in = particles(1,par_ind).gm_mu(:,GM_in_FOV);
                 GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
                 GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
                 
-                num_GM_in = size(GM_inten_in,2);
+                %
+                num_GM = size(particles(1,par_ind).gm_inten,2);
+                GM_cov = particles(1,par_ind).gm_cov; 
+                GM_mu = particles(1,par_ind).gm_mu;
+                GM_inten = particles(1,par_ind).gm_inten;
+                card_dist = particles(1,par_ind).card_dist;
     
                 %% Per particle map update
                 % Only do update if there are GM in the FOV
-                if num_GM_in > 0
-                    for jj = 1:num_GM_in
-                        GM_cov_in(:,:,jj) = GM_cov_in(:,:,jj) + filter_params.map_Q;
+                if num_GM > 0
+                    % CPHD time update with special case of no birth or
+                    % death. Birth will be added afterward using curent
+                    % measurement. 
+
+                    % Essentially, the PHD and card_dist stays the same
+                    % here
+
+                    for jj = 1:num_GM
+                        GM_cov(:,:,jj) = GM_cov(:,:,jj) + filter_params.map_Q;
                     end
-    
-                    [particles(1,par_ind).w, GM_mu_in, GM_cov_in, GM_inten_in]=...
-                        phd_measurement_update(particles(1,par_ind),...
-                        GM_mu_in, GM_cov_in, GM_inten_in, cur_meas, filter_params);
+                        
+                    % CPHD meas update
+                    [particles(1,par_ind).w, GM_mu, GM_cov, GM_inten, card_dist]=...
+                        cphd_measurement_update(particles(1,par_ind),...
+                        GM_mu, GM_cov, GM_inten, card_dist, detect_prob_vec, ...
+                        cur_meas, filter_params);
     
                     %% Clean up GM components
-                    [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
-                    GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
+                    [GM_mu, GM_cov, GM_inten] = cleanup_PHD (GM_mu,...
+                    GM_cov, GM_inten, filter_params.pruning_thres, ...
                     filter_params.merge_dist, filter_params.num_GM_cap);
     
                     %% Parse updated GM and include out of FOV components
-                    particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
-                    particles(1,par_ind).gm_inten = cat (2, GM_inten_in, GM_inten_out);
-                    particles(1,par_ind).gm_cov = cat(3,GM_cov_in, GM_cov_out);
+                    particles(1,par_ind).gm_mu = GM_mu;
+                    particles(1,par_ind).gm_inten = GM_inten;
+                    particles(1,par_ind).gm_cov = GM_cov;
+                    particles(1,par_ind).card_dist = card_dist;
     
                 else%num_GM_in > 0
                     particles(1,par_ind).w = 1e-99;
@@ -226,8 +258,8 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
         est.map{kk,1} = map_est_struct;
 
-        % Adaptive birth PHD (Lin Gao's implementation)
-        particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
+        % Adaptive birth CPHD (modified Lin Gao's implementation)
+        particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
             cur_meas, map_est_struct, filter_params, particles);
         
         % Resample (if needed)
@@ -282,6 +314,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
 
     end %kk = 2:size(time_vec,2)
     
+    % obj.close();
     % End simulation
     results.truth = truth;
     results.filter_est = est;

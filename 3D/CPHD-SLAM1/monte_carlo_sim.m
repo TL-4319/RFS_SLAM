@@ -1,3 +1,5 @@
+% Run monte carlo 2D simulations. Fundamental data and formulation is 3D 
+% dynamics but constraints are added to restrict motions to 2D
 close all;
 clear;
 clc;
@@ -25,7 +27,7 @@ sensor_params.min_range = 0.4;
 sensor_params.detect_prob = 0.95;
 sensor_params.sensor_rate = 0.8;
 sensor_params.measurement_std = [0.1, 0.01, 0.01];  
-sensor_params.avg_num_clutter = 5;
+sensor_params.avg_num_clutter = 2;
 sensor_params.pos_body_sensor = dataset.pos_body_sensor;
 sensor_params.quat_body_sensor = dataset.quat_body_sensor;
 
@@ -43,7 +45,7 @@ odom_params.motion_sigma = [0.1; 0.1; 0; 0.01; 0.01; 0.03];
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
 filter_params.sensor.detect_prob = 0.95;
 filter_params.sensor.measurement_std = [0.1, 0.01, 0.01];
-filter_params.sensor.avg_num_clutter = 5;
+filter_params.sensor.avg_num_clutter = 2;
 
 % Particle filter params
 filter_params.num_particle = 1;
@@ -55,11 +57,12 @@ filter_params.likelihood_method = 'single-cluster'; %['empty', 'single-feature, 
 filter_params.motion_model = 'truth'; % [odometry, random-walk, truth]
 filter_params.motion_sigma = [0.1; 0.1; 0.0; 0.03; 0.03; 0.03];
 
-% Map PHD config
-filter_params.birthGM_intensity = 1;             % Default intensity of GM component when birth
+% Map CPHD config
+filter_params.max_card = 100;
+filter_params.birthGM_intensity = 0.3;             % Default intensity of GM component when birth
 filter_params.birthGM_std = 0.5;                  % Default standard deviation in position of GM component when birth
 filter_params.map_std = 0.1;
-filter_params.adaptive_birth_dist_thres = 0.3;
+filter_params.adaptive_birth_dist_thres = 0.2;
 filter_params.GM_inten_thres = 0.5;                % Threshold to use a component for importance weight calc and plotting
 filter_params.pruning_thres = 10^-3;
 filter_params.merge_dist = 0.3;
@@ -86,7 +89,7 @@ results = cell(num_run,1);
 file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
 for ii = 1:num_run
-    results{ii,1} = phd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
+    results{ii,1} = cphd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
 end
 
 simulation.result = results;
