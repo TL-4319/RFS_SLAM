@@ -68,9 +68,9 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
             body_trans_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
             body_trans_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
 
-            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(1));
-            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
-            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
+            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(4));
+            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(5));
+            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(6));
     
             body_trans_vel = dataset.trans_vel_body(:,kk) + body_trans_vel_sample;
             body_rot_vel = dataset.rot_vel_body(:,kk) + body_rot_vel_sample;
@@ -126,8 +126,8 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         
         if meas_avail
             cur_meas = meas_table{sensor_time_ind,1};
-            [sensor_pos, sensor_quat] = get_sensor_pose(particles(1,par_ind).pos,...
-                    particles(1,par_ind).quat,sensor_params);
+            [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,kk),...
+                    truth.quat(kk),sensor_params);
             meas_reprojected = reproject_meas(sensor_pos, sensor_quat,...
                 cur_meas, sensor_params);
 
@@ -142,12 +142,15 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
 
             %% Particle time update
             if strcmp(filter_params.motion_model,'odometry')
-                % Sample odometry - constraint to 2D
                 body_trans_vel_sample = zeros(3,1);
                 body_rot_vel_sample = zeros(3,1);
     
                 body_trans_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
                 body_trans_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(2));
+                body_trans_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
+
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(2));
                 body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
 
                 % Add noise to odom measurement
@@ -230,13 +233,14 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
         est.map_est{sensor_time_ind,1} = map_est_struct;
-
-        % Adaptive birth PHD (Lin Gao's implementation)
-        particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
-            cur_meas, map_est_struct, filter_params, particles);
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+
+        % Adaptive birth PHD 
+        % particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
+        %     cur_meas, map_est_struct, filter_params, particles);  % (Lin Gao's implementation)
+        particles = adaptive_birth_PHD_3D_per_part(cur_meas, filter_params, particles); 
 
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
@@ -265,7 +269,7 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
             ones(size(map_est,2),1) * 10,'r+')
 
-        plot_3D_phd(map_est_struct, 100, 0.2, 1, 2)
+        %plot_3D_phd(map_est_struct, 100, 0.2, 1, 2)
         xlabel("X (m)");
         ylabel("Y (m)");
         zlabel("Z (m)");
@@ -277,10 +281,10 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         
         colorbar
         title(title_str)
-        view(0,90)
+        %view(0,90)
         drawnow
-        savefig(fig1, "test.fig")
-        writeVideo(obj,getframe(openfig("test.fig","invisible")));
+        %savefig(fig1, "test.fig")
+        %writeVideo(obj,getframe(openfig("test.fig","invisible")));
         end %draw
         
 
