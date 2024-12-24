@@ -5,11 +5,14 @@ function [meas, perfect_meas,landmark_in_FOV, PD_vec_multi] = ...
 
     %% FOV Check
     % Return true landmark position within FOV in world frame
-    % Return true landmark position within FOV in sensor frame as perfect
-    % meas
-    [perfect_xyz_pos_diff, perfect_meas, is_in_FOV, PD_vec_multi] = ...
+    [is_in_FOV, PD_vec_multi] = ...
         check_in_FOV_3D(landmark, sensor_pos, sensor_quat, sensor_params);
     landmark_in_FOV = landmark(:,is_in_FOV);
+    
+    perfect_meas = zeros(3,size(landmark_in_FOV,2));
+
+    [perfect_meas(1,:), perfect_meas(2,:), perfect_meas(3,:)] = ...
+        calc_rbe_in_body(landmark_in_FOV, sensor_pos, sensor_quat);
 
     %% Add noise, detection prob and clutter to measurement
     % Meas detect

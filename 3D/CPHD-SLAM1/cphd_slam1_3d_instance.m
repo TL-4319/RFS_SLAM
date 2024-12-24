@@ -1,6 +1,6 @@
-function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
-    %rng(420)
+    rng(420)
     time_vec = dataset.time_vec;
     dt = time_vec(2) - time_vec(1);
 
@@ -68,9 +68,9 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
             body_trans_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
             body_trans_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
 
-            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(4));
-            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(5));
-            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(6));
+            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(1));
+            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
+            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
     
             body_trans_vel = dataset.trans_vel_body(:,kk) + body_trans_vel_sample;
             body_rot_vel = dataset.rot_vel_body(:,kk) + body_rot_vel_sample;
@@ -90,7 +90,7 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
 
     est.pos = truth.pos;
     est.quat = truth.quat;
-    est.map_est = cell(size(sensor_time_vec,2),1);
+    est.map_est = cell(size(time_vec,2),1);
     est.compute_time = zeros(size(time_vec,2),1);
     
     %% Initialize filter
@@ -109,18 +109,16 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         error(error_msg);
     end
 
-    particles = init_phd1_particles_3D(truth.pos(:,1),...
+    particles = init_cphd1_particles_3D(truth.pos(:,1),...
         truth.quat(1,:),meas_world_frame,filter_params);
 
     %% Run simulation
     sensor_time_ind = 2;
 
-    if draw
-        obj = VideoWriter("myvideo","Motion JPEG AVI");
-        obj.Quality = 100;
-        obj.FrameRate = 5;
-        open(obj);
-    end
+     % obj = VideoWriter("myvideo","Motion JPEG AVI");
+     % obj.Quality = 100;
+     % obj.FrameRate = 5;
+     % open(obj);
 
     for kk = 2:size(time_vec,2) 
         %% Get current measurements and reproject for viz if measurement avail
@@ -144,15 +142,12 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
 
             %% Particle time update
             if strcmp(filter_params.motion_model,'odometry')
+                % Sample odometry - constraint to 2D
                 body_trans_vel_sample = zeros(3,1);
                 body_rot_vel_sample = zeros(3,1);
     
                 body_trans_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
                 body_trans_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(2));
-                body_trans_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
-
-                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
-                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(2));
                 body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
 
                 % Add noise to odom measurement
@@ -177,6 +172,13 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
             %if false
             if meas_avail
                 %PF meas update if measurement available
+                % In CPHD filter while it is possible to split the PHD and
+                % card distribution, it is not trivial. This implementation
+                % apply the CPHD over the entire per-particle map PHD,
+                % treating out-of-FOV compoenent as having 0% detect prob.
+
+                % Further research and implementation of CPHD splitting and
+                % merging might lower compute time.
 
                 %% GM component checking step
                 % Check for GM in FOV
@@ -186,41 +188,61 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
                     particles(1,par_ind).quat,sensor_params);
                 [GM_in_FOV,~] = check_in_FOV_3D(gm_mu_temp, ...
                     sensor_pos, sensor_quat, sensor_params);
-    
-                 % Extract GM components not in FOV. No changes are made to them
+                
+                % Construct statistics for map GMs
+                detect_prob_vec = filter_params.sensor.detect_prob * GM_in_FOV;
+                
+                 % Extract GM components not in FOV. No changes are made to
+                 % them. This is not used in CPHD
                 GM_out_FOV = ~GM_in_FOV;
                 GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
                 GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
                 GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
         
-                % Extract GM components in FOV. These are used during update
+                % Extract GM components in FOV. These are used during
+                % update. Not used in CPHD 
                 % Predict 
                 GM_mu_in = particles(1,par_ind).gm_mu(:,GM_in_FOV);
                 GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
                 GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
                 
-                num_GM_in = size(GM_inten_in,2);
+                %
+                num_GM = size(particles(1,par_ind).gm_inten,2);
+                GM_cov = particles(1,par_ind).gm_cov; 
+                GM_mu = particles(1,par_ind).gm_mu;
+                GM_inten = particles(1,par_ind).gm_inten;
+                card_dist = particles(1,par_ind).card_dist;
     
                 %% Per particle map update
                 % Only do update if there are GM in the FOV
-                if num_GM_in > 0
-                    for jj = 1:num_GM_in
-                        GM_cov_in(:,:,jj) = GM_cov_in(:,:,jj) + filter_params.map_Q;
+                if num_GM > 0
+                    % CPHD time update with special case of no birth or
+                    % death. Birth will be added afterward using curent
+                    % measurement. 
+
+                    % Essentially, the PHD and card_dist stays the same
+                    % here
+
+                    for jj = 1:num_GM
+                        GM_cov(:,:,jj) = GM_cov(:,:,jj) + filter_params.map_Q;
                     end
-    
-                    [particles(1,par_ind).w, GM_mu_in, GM_cov_in, GM_inten_in]=...
-                        phd_measurement_update(particles(1,par_ind),...
-                        GM_mu_in, GM_cov_in, GM_inten_in, cur_meas, filter_params);
+                        
+                    % CPHD meas update
+                    [particles(1,par_ind).w, GM_mu, GM_cov, GM_inten, card_dist]=...
+                        cphd_measurement_update(particles(1,par_ind),...
+                        GM_mu, GM_cov, GM_inten, card_dist, detect_prob_vec, ...
+                        cur_meas, filter_params);
     
                     %% Clean up GM components
-                    [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
-                    GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
+                    [GM_mu, GM_cov, GM_inten] = cleanup_PHD (GM_mu,...
+                    GM_cov, GM_inten, filter_params.pruning_thres, ...
                     filter_params.merge_dist, filter_params.num_GM_cap);
     
-                    %% Parse updated GM and include out of FOV components
-                    particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
-                    particles(1,par_ind).gm_inten = cat (2, GM_inten_in, GM_inten_out);
-                    particles(1,par_ind).gm_cov = cat(3,GM_cov_in, GM_cov_out);
+                    %% Parse updated GM and cardinality distribution
+                    particles(1,par_ind).gm_mu = GM_mu;
+                    particles(1,par_ind).gm_inten = GM_inten;
+                    particles(1,par_ind).gm_cov = GM_cov;
+                    particles(1,par_ind).card_dist = card_dist;
     
                 else%num_GM_in > 0
                     particles(1,par_ind).w = 1e-99;
@@ -234,15 +256,16 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map_est{sensor_time_ind,1} = map_est_struct;
+        est.map{kk,1} = map_est_struct;
+    
+        if meas_avail
+            % Adaptive birth CPHD (modified Lin Gao's implementation)
+            particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
+                cur_meas, map_est_struct, filter_params, particles);
+        end
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
-
-        % Adaptive birth PHD 
-        % particles = adaptive_birth_PHD_3D (pose_est.pos, pose_est.quat,...
-        %     cur_meas, map_est_struct, filter_params, particles);  % (Lin Gao's implementation)
-        particles = adaptive_birth_PHD_3D_per_part(cur_meas, filter_params, particles); 
 
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
@@ -267,9 +290,10 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
             ones(size(meas_reprojected,2),1) * 50,'b*');
-        
+        if size(map_est,2) > 0
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
             ones(size(map_est,2),1) * 10,'r+')
+        end
 
         %plot_3D_phd(map_est_struct, 100, 0.2, 1, 2)
         xlabel("X (m)");
@@ -285,21 +309,20 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         title(title_str)
         %view(0,90)
         drawnow
+        % savefig(fig1, "test.fig")
+        % writeVideo(obj,getframe(openfig("test.fig","invisible")));
+        % writeVideo(obj,getframe(gcf));
         end %draw
         
 
     end %kk = 2:size(time_vec,2)
-
-    if draw
-        obj.close();
-    end
-
+    
+    % obj.close();
     % End simulation
-    results.meas_table = meas_table;
+    results.truth = truth;
     results.filter_est = est;
     results.odom_est = odom;
-    truth.sensor_time_vec = sensor_time_vec;
-    truth.time_vec = time_vec;
+    results.time_vec = time_vec;
 
 
 end
