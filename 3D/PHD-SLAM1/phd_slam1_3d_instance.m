@@ -151,9 +151,9 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
                 body_trans_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(2));
                 body_trans_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
 
-                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
-                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(2));
-                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(5));
+                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
 
                 % Add noise to odom measurement
                 body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
@@ -254,8 +254,8 @@ function [results, truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_p
         figure(1)
         draw_trajectory(truth.pos(:,kk), truth.quat(kk,:), truth.pos(:,1:kk),2, 2,'k',false);
         draw_trajectory(sensor_pos, sensor_quat, truth.pos(:,1:kk),2, 2,'none',true);
-        %draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
-        %draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 2, 2, 'r',true);
+        draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
+        draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 2, 2, 'r',true);
         hold on
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
