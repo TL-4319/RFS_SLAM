@@ -264,6 +264,14 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     
         if meas_avail
             % Adaptive birth CPHD (modified Lin Gao's implementation)
+
+            % CPHD time 
+                    
+
+                    for jj = 1:num_GM
+                        GM_cov(:,:,jj) = GM_cov(:,:,jj) + filter_params.map_Q;
+                    end
+            
             particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
                 cur_meas, map_est_struct, filter_params, particles);
         end
