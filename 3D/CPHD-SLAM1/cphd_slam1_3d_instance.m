@@ -68,9 +68,9 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
             body_trans_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
             body_trans_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
 
-            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(1));
-            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
-            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
+            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(4));
+            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(5));
+            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(6));
     
             body_trans_vel = dataset.trans_vel_body(:,kk) + body_trans_vel_sample;
             body_rot_vel = dataset.rot_vel_body(:,kk) + body_rot_vel_sample;
@@ -260,6 +260,14 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     
         if meas_avail
             % Adaptive birth CPHD (modified Lin Gao's implementation)
+
+            % CPHD time 
+                    
+
+                    for jj = 1:num_GM
+                        GM_cov(:,:,jj) = GM_cov(:,:,jj) + filter_params.map_Q;
+                    end
+            
             particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
                 cur_meas, map_est_struct, filter_params, particles);
         end
