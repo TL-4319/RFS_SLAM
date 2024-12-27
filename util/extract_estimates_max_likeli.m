@@ -25,7 +25,7 @@ function [pose_est, map_est] = extract_estimates_max_likeli (particle, filter_pa
         map_est.exp_num_landmark = size(any(ID_map),1);
     elseif strcmp(filter_params.map_est_method,'cphd')
         [~,max_card_ind] = max(max_likeli_card_dist);
-        map_est.exp_num_landmark = max_card_ind - 1;
+        map_est.exp_num_landmark = min([max_card_ind - 1,size(max_likeli_gm_mu,2)]);
         [~,ID_map] = maxk (max_likeli_gm_inten, map_est.exp_num_landmark);
     end
     map_est.feature_pos = max_likeli_gm_mu(:,ID_map);

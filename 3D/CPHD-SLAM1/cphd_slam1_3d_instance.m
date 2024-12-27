@@ -148,7 +148,11 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     
                 body_trans_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
                 body_trans_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(2));
-                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
+                body_trans_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
+
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
+                body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
+                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
 
                 % Add noise to odom measurement
                 body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
@@ -222,10 +226,6 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
 
                     % Essentially, the PHD and card_dist stays the same
                     % here
-
-                    for jj = 1:num_GM
-                        GM_cov(:,:,jj) = GM_cov(:,:,jj) + filter_params.map_Q;
-                    end
                         
                     % CPHD meas update
                     [particles(1,par_ind).w, GM_mu, GM_cov, GM_inten, card_dist]=...
@@ -257,23 +257,20 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
         est.map{kk,1} = map_est_struct;
-    
-        if meas_avail
-            % Adaptive birth CPHD (modified Lin Gao's implementation)
-
-            % CPHD time 
-                    
-
-                    for jj = 1:num_GM
-                        GM_cov(:,:,jj) = GM_cov(:,:,jj) + filter_params.map_Q;
-                    end
-            
-            particles = adaptive_birth_CPHD_3D (pose_est.pos, pose_est.quat,...
-                cur_meas, map_est_struct, filter_params, particles);
-        end
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+
+        %% CPHD-time update
+        if meas_avail
+            %% Generate birth intensity and cardinality. Based on Lin Gao's
+            % birth determination scheme
+            particles = adaptive_birth_and_time_update_CPHD_3D (cur_meas, ...
+                filter_params, particles);
+            
+        end
+        
+        
 
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
@@ -283,27 +280,40 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,kk), truth.quat(kk,:), sensor_params);
 
         figure(1)
+        % Draw robot and sensor pose
         draw_trajectory(truth.pos(:,kk), truth.quat(kk,:), truth.pos(:,1:kk),2, 2,'k',false);
         draw_trajectory(sensor_pos, sensor_quat, truth.pos(:,1:kk),2, 2,'none',true);
+
+        % Draw filter estimates
         %draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
+
+        %Draw odometry estimates
         %draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 2, 2, 'r',true);
+
         hold on
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
+
+        % Draw true landmark position
         scatter3(truth.cummulative_landmark_in_FOV{end,1}(1,:),...
             truth.cummulative_landmark_in_FOV{end,1}(2,:),...
             truth.cummulative_landmark_in_FOV{end,1}(3,:),...
             ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 50,'k')
         
+        % Draw measurements reprojected in global frame from true pose
         scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
             ones(size(meas_reprojected,2),1) * 50,'b*');
+
+        % Draw map estimate
         if size(map_est,2) > 0
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
             ones(size(map_est,2),1) * 10,'r+')
         end
+        
+        % Draw map est coveriance ellipsoids
+        %plot_3D_phd(map_est_struct, 1, 0.00001, 1, 2)
 
-        %plot_3D_phd(map_est_struct, 100, 0.2, 1, 2)
         xlabel("X (m)");
         ylabel("Y (m)");
         zlabel("Z (m)");
@@ -315,7 +325,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         
         %colorbar
         title(title_str)
-        %view(0,90)
+        view(0,90)
         drawnow
         % savefig(fig1, "test.fig")
         % writeVideo(obj,getframe(openfig("test.fig","invisible")));
