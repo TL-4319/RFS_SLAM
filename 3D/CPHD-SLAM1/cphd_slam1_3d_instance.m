@@ -154,6 +154,10 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
                 body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
                 body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
 
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
+                body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
+                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
+
                 % Add noise to odom measurement
                 body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
                 body_rot_vel = odom.body_rot_vel(:,kk) + body_rot_vel_sample;
