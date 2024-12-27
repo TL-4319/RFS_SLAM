@@ -39,11 +39,6 @@ for par_ind = 1:size(particle,2)
     n_new_birth = size(new_birth_inten,2);
     if n_new_birth > 0
 
-        % Add birth terms and in a sense, performing time update
-        particle(1,par_ind).gm_cov = cat(3,particle(1,par_ind).gm_cov, new_birth_cov);
-        particle(1,par_ind).gm_inten = horzcat(particle(1,par_ind).gm_inten, new_birth_inten);
-        particle(1,par_ind).gm_mu = horzcat(particle(1,par_ind).gm_mu, new_birth_mu);
-
         % survival cardinality
         survive_card_pred = zeros(1,filter.max_card+1);
 
@@ -58,6 +53,16 @@ for par_ind = 1:size(particle,2)
             end
             survive_card_pred(ind_n) = sum(terms);
         end
+
+        % GM component do not move but inflate uncertainty 
+        for jj = 1:size(cur_GM_mu,2)
+            particle(1,par_ind).gm_cov(:,:,jj) = particle(1,par_ind).gm_cov(:,:,jj) + filter.map_Q;
+        end
+        
+        % Add birth terms 
+        particle(1,par_ind).gm_cov = cat(3,particle(1,par_ind).gm_cov, new_birth_cov);
+        particle(1,par_ind).gm_inten = horzcat(particle(1,par_ind).gm_inten, new_birth_inten);
+        particle(1,par_ind).gm_mu = horzcat(particle(1,par_ind).gm_mu, new_birth_mu);
 
         card_pred = zeros(1,filter.max_card+1);
 

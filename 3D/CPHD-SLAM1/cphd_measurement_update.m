@@ -23,12 +23,14 @@ detect_prob_vec, meas, filter_params)
         % Pre compute for elementary symmetric function
         XI_vals = zeros(num_meas,1); % input to esf
         for zz = 1:num_meas
-            %XI_vals(zz) = (detect_prob_vec .* GM_inten) * meas_likelihood(:,zz) ...
-            %    / filter_params.sensor.clutter_density;
+            % XI_vals(zz) = (detect_prob_vec .* GM_inten_prev) * meas_likelihood(:,zz) ...
+            %     / filter_params.sensor.clutter_density;
             XI_vals(zz) = (detect_prob_vec .* GM_inten) * meas_likelihood(:,zz) ...
                 * filter_params.sensor.meas_area;
         end
         
+        
+
         esfvals_E = esf(XI_vals); %calculate esf for entire observation set
         esfvals_D = zeros(num_meas, num_meas); %calculate esf with each observation index removed one-by-one
         
@@ -40,6 +42,9 @@ detect_prob_vec, meas, filter_params)
         upsilon0_E = zeros(filter_params.max_card+1, 1);
         upsilon1_E = upsilon0_E;
         upsilon1_D = zeros(filter_params.max_card+1, num_meas);
+
+        % mis_detect_prob_inner_prod_est = (ones(size(detect_prob_vec)) - detect_prob_vec) *...
+        %     GM_inten_prev' / size(detect_prob_vec,2); % Approx of <1-P_d, inten> by James McCabe
 
         mis_detect_prob_inner_prod_est = (ones(size(detect_prob_vec)) - detect_prob_vec) *...
             GM_inten_prev'; % Approx of <1-P_d, inten> by James McCabe
@@ -58,14 +63,14 @@ detect_prob_vec, meas, filter_params)
                 term0_E(ind_j) = exp( -filter_params.sensor.avg_num_clutter + (num_meas - jj) * log(filter_params.sensor.avg_num_clutter)+...
                     sum(log(1:nn)) - sum(log(1:nn-jj)) +...
                     (nn - jj) * log(mis_detect_prob_inner_prod_est) -...
-                    jj * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
+                    nn * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
                 
                 %calculate upsilon1_E(idxn)
                 if nn >= jj+1
                     term1_E(ind_j) = exp( -filter_params.sensor.avg_num_clutter + (num_meas - jj) * log(filter_params.sensor.avg_num_clutter)+...
                     sum(log(1:nn)) - sum(log(1:nn-(jj+1))) +...
                     (nn - (jj+1)) * log(mis_detect_prob_inner_prod_est) -...
-                    (jj+1) * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
+                    (nn) * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
                 end
 
                 
@@ -85,7 +90,8 @@ detect_prob_vec, meas, filter_params)
                         term1_D(ind_j, zz) = exp( -filter_params.sensor.avg_num_clutter + ((num_meas-1) - jj) * log(filter_params.sensor.avg_num_clutter)+...
                     sum(log(1:nn)) - sum(log(1:nn-(jj+1))) +...
                     (nn - (jj+1)) * log(mis_detect_prob_inner_prod_est) -...
-                    (jj+1) * log(sum(GM_inten))) * esfvals_D(ind_j,zz);
+                    (nn) * log(sum(GM_inten))) * esfvals_D(ind_j,zz);
+
                     end
                 end
             end
@@ -116,8 +122,8 @@ detect_prob_vec, meas, filter_params)
                 GM_mu = horzcat(GM_mu, mu);
                 GM_cov = cat(3,GM_cov, P(:,:,jj));
 
-                %nu = (upsilon1_D(:,zz)' * card_dist')/(upsilon0_E' * card_dist') * ...
-                %detect_prob_vec(jj) .* meas_likelihood(jj,zz)/filter_params.sensor.clutter_density .* GM_inten_prev(jj);
+                % nu = (upsilon1_D(:,zz)' * card_dist')/(upsilon0_E' * card_dist') * ...
+                % detect_prob_vec(jj) .* meas_likelihood(jj,zz)/filter_params.sensor.clutter_density .* GM_inten_prev(jj);
                 nu = (upsilon1_D(:,zz)' * card_dist')/(upsilon0_E' * card_dist') * ...
                 detect_prob_vec(jj) .* meas_likelihood(jj,zz) * filter_params.sensor.meas_area .* GM_inten_prev(jj);
 

@@ -1,4 +1,4 @@
-function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
     rng(420)
     time_vec = dataset.time_vec;
@@ -16,7 +16,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     if draw
         fig1 = figure(1);
         title ("Sim world")
-        fig1.Position = [1,1,2000,1000];
+        fig1.Position = [1,1,1000,1000];
 
     end
 
@@ -316,7 +316,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         end
         
         % Draw map est coveriance ellipsoids
-        %plot_3D_phd(map_est_struct, 1, 0.00001, 1, 2)
+        plot_3D_phd(map_est_struct, 1, 0.00001, 1, 0)
 
         xlabel("X (m)");
         ylabel("Y (m)");
@@ -324,15 +324,15 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
         axis equal;
         xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
         ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
-        zlim([-2 2])
+        zlim([-5 5])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
         
-        %colorbar
+        colorbar
         title(title_str)
         view(0,90)
         drawnow
-        % savefig(fig1, "test.fig")
-        % writeVideo(obj,getframe(openfig("test.fig","invisible")));
+        % % savefig(fig1, "test.fig")
+        % %writeVideo(obj,getframe(openfig("test.fig","invisible")));
         % writeVideo(obj,getframe(gcf));
         end %draw
         
@@ -345,6 +345,7 @@ function results = phd_slam1_3d_instance(dataset, sensor_params, odom_params, fi
     results.filter_est = est;
     results.odom_est = odom;
     results.time_vec = time_vec;
-
+    truth.sensor_time_vec = sensor_time_vec;
+    truth.time_vec = time_vec;
 
 end

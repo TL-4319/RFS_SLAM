@@ -6,7 +6,7 @@ clc;
 num_run = 1;
 
 % Visualization
-draw = false;
+draw = true;
 
 % add path to util functions. 
 addpath('../../util/')
@@ -56,15 +56,15 @@ filter_params.motion_model = 'truth'; % [odometry, random-walk, truth]
 filter_params.motion_sigma = [0.1; 0.1; 0.0; 0.03; 0.03; 0.03];
 
 % Map CPHD config
-filter_params.max_card = 100;
-filter_params.survive_prob = 0.9;
-filter_params.birthGM_intensity = 0.03;             % Default intensity of GM component when birth
+filter_params.max_card = 150;
+filter_params.survive_prob = 0.99;
+filter_params.birthGM_intensity = 0.8;             % Default intensity of GM component when birth
 filter_params.birthGM_std = 1;                  % Default standard deviation in position of GM component when birth
-filter_params.map_std = 0.1;
-filter_params.adaptive_birth_dist_thres = 0.2;
+filter_params.map_std = 0;
+filter_params.adaptive_birth_dist_thres = 1;
 filter_params.GM_inten_thres = 0.5;                % Threshold to use a component for importance weight calc and plotting
-filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 0.3;
+filter_params.pruning_thres = 10^-8;
+filter_params.merge_dist = 4;
 filter_params.num_GM_cap = 10000;
 filter_params.inner_filter = 'ekf';
 filter_params.map_est_method = 'cphd';           % Method to extract map est. 'exp' or 'thres' or 'cphd'
@@ -87,10 +87,14 @@ simulation.odom_params = odom_params;
 results = cell(num_run,1);
 file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
-for ii = 1:num_run
-    results{ii,1} = cphd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
+for ii = 1:num_run-1
+    [results{ii,1},~] = cphd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
 end
 
+[results{num_run,1},truth] = cphd_slam1_3d_instance(dataset,sensor_params, odom_params, filter_params, draw);
+
+
+simulation.truth = truth;
 simulation.result = results;
 
 
