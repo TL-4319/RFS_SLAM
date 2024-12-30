@@ -6,7 +6,7 @@ clc;
 num_run = 1;
 
 % Visualization
-draw = true;
+draw = false;
 
 % add path to util functions. 
 addpath('../../util/')
@@ -60,11 +60,11 @@ filter_params.motion_sigma = [0.5; 0.5; 0; 0.001; 0.001; 0.5];
 
 filter_params.birthGM_intensity =  0.05;             % Default intensity of GM component when birth
 filter_params.birthGM_std = 0.5;                  % Default standard deviation in position of GM component when birth
-filter_params.map_std = 0.1;
-filter_params.adaptive_birth_dist_thres = 0.2;
+filter_params.map_std = 0;
+filter_params.adaptive_birth_dist_thres = 1;
 filter_params.GM_inten_thres = 0.5;                % Threshold to use a component for importance weight calc and plotting
 filter_params.pruning_thres = 10^-5;
-filter_params.merge_dist = 0.3;
+filter_params.merge_dist = 4;
 filter_params.num_GM_cap = 5000;
 filter_params.inner_filter = 'ekf';
 filter_params.map_est_method = 'exp';           % Method to extract map est. 'exp' or 'thres'

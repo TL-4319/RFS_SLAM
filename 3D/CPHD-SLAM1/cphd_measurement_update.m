@@ -152,11 +152,11 @@ detect_prob_vec, meas, filter_params)
         card_dist = upsilon0_E' .* card_dist;
         card_dist = card_dist/sum(card_dist,2); % Normalize
 
-        figure(2)
-        plot(card_dist)
-        ylim([0 1])
-        xlim([0 filter_params.max_card])
-        drawnow
+        % figure(2)
+        % plot(card_dist)
+        % ylim([0 1])
+        % xlim([0 filter_params.max_card])
+        % drawnow
 
     else
         error_msg = strcat(filter_params.inner_filter, " inner filter is not supported");

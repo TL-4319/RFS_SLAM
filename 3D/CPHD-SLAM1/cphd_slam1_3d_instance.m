@@ -1,6 +1,6 @@
-function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
-    rng(420)
+    %rng(420)
     time_vec = dataset.time_vec;
     dt = time_vec(2) - time_vec(1);
 
@@ -90,7 +90,7 @@ function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_pa
 
     est.pos = truth.pos;
     est.quat = truth.quat;
-    est.map_est = cell(size(time_vec,2),1);
+    est.map_est = cell(size(sensor_time_vec,2),1);
     est.compute_time = zeros(size(time_vec,2),1);
     
     %% Initialize filter
@@ -260,7 +260,7 @@ function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_pa
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map{kk,1} = map_est_struct;
+        est.map_est{sensor_time_ind,1} = map_est_struct;
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
@@ -312,11 +312,11 @@ function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_pa
         % Draw map estimate
         if size(map_est,2) > 0
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
-            ones(size(map_est,2),1) * 10,'r+')
+            ones(size(map_est,2),1) * 50,'r+')
         end
         
         % Draw map est coveriance ellipsoids
-        plot_3D_phd(map_est_struct, 1, 0.00001, 1, 0)
+        plot_3D_phd(map_est_struct, 1, 0.00001, 1, 2)
 
         xlabel("X (m)");
         ylabel("Y (m)");
@@ -328,6 +328,7 @@ function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_pa
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
         
         colorbar
+        clim([0 1.3])
         title(title_str)
         view(0,90)
         drawnow
@@ -341,10 +342,9 @@ function [results,truth] = phd_slam1_3d_instance(dataset, sensor_params, odom_pa
     
     % obj.close();
     % End simulation
-    results.truth = truth;
+    results.meas_table = meas_table;
     results.filter_est = est;
     results.odom_est = odom;
-    results.time_vec = time_vec;
     truth.sensor_time_vec = sensor_time_vec;
     truth.time_vec = time_vec;
 
