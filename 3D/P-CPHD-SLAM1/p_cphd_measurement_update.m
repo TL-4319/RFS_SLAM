@@ -1,5 +1,5 @@
-function [likelihood, GM_mu_update, GM_cov_update, GM_inten_update, card_dist] = ...
-p_cphd_measurement_update (particle, GM_mu, GM_cov, GM_inten, card_dist, ...
+function [likelihood, GM_mu_update, GM_cov_update, GM_inten_update, card_dist_update] = ...
+p_cphd_measurement_update (particle, GM_mu, GM_cov, GM_inten, card_dist_prev, ...
 detect_prob_vec, meas, filter_params)
     
     % Utilize code from Vo's implementation of CPHD
@@ -15,7 +15,7 @@ detect_prob_vec, meas, filter_params)
 
         % Pre compute measurement matrices
         [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RBE(particle, ...
-            GM_mu, GM_cov, filter_params.sensor);
+            GM_mu_prev, GM_cov_prev, filter_params.sensor);
 
         % Pre compute measurement likelihood of meas zz to gm component jj
         meas_likelihood = calc_meas_likelihood(meas, pred_z, S, Sinv);
@@ -98,7 +98,7 @@ detect_prob_vec, meas, filter_params)
         % Update GM components as misdetected with state dependent
         % detect probabilities
         mis_detect_prob_vec = ones(size(detect_prob_vec)) - detect_prob_vec;
-        GM_inten = (upsilon1_E' * card_dist')/(upsilon0_E' * card_dist') *...
+        GM_inten = (upsilon1_E' * card_dist_prev')/(upsilon0_E' * card_dist_prev') *...
             mis_detect_prob_vec .* GM_inten_prev;
 
         % Update GM components as detected
@@ -116,7 +116,7 @@ detect_prob_vec, meas, filter_params)
                 GM_mu = horzcat(GM_mu, mu);
                 GM_cov = cat(3,GM_cov, P(:,:,jj));
 
-                nu = (upsilon1_D(:,zz)' * card_dist')/(upsilon0_E' * card_dist') * ...
+                nu = (upsilon1_D(:,zz)' * card_dist_prev')/(upsilon0_E' * card_dist_prev') * ...
                 detect_prob_vec(jj) .* meas_likelihood(jj,zz)/filter_params.sensor.clutter_density .* GM_inten_prev(jj);
                 % nu = (upsilon1_D(:,zz)' * card_dist')/(upsilon0_E' * card_dist') * ...
                 % detect_prob_vec(jj) .* meas_likelihood(jj,zz) * filter_params.sensor.meas_area .* GM_inten_prev(jj);
@@ -124,7 +124,7 @@ detect_prob_vec, meas, filter_params)
                 GM_inten = horzcat(GM_inten, nu);
             end %jj = 1:num_GM
             likelipz(1,zz) = filter_params.sensor.clutter_density + sum(likelipf,2);
-            sum_tau = filter_params.sensor.clutter_density + sum(tau,2);
+            %sum_tau = filter_params.sensor.clutter_density + sum(tau,2);
                  
 
         end %zz = 1:size(meas,2)
@@ -150,8 +150,8 @@ detect_prob_vec, meas, filter_params)
         % end
         % hold off
         % Card update
-        card_dist = upsilon0_E' .* card_dist;
-        card_dist = card_dist/sum(card_dist,2); % Normalize
+        card_dist_update = upsilon0_E' .* card_dist_prev;
+        card_dist_update = card_dist_update/sum(card_dist_update,2); % Normalize
 
         % figure(2)
         % plot(card_dist)

@@ -154,10 +154,6 @@ function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom
                 body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
                 body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
 
-                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
-                body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
-                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
-
                 % Add noise to odom measurement
                 body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
                 body_rot_vel = odom.body_rot_vel(:,kk) + body_rot_vel_sample;
@@ -180,13 +176,9 @@ function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom
             %if false
             if meas_avail
                 %PF meas update if measurement available
-                % In CPHD filter while it is possible to split the PHD and
-                % card distribution, it is not trivial. This implementation
-                % apply the CPHD over the entire per-particle map PHD,
-                % treating out-of-FOV compoenent as having 0% detect prob.
-
-                % Further research and implementation of CPHD splitting and
-                % merging might lower compute time.
+                % This implementation partition the map space into in_FOV
+                % and out_FOV component and only apply the CPHD measurement
+                % update steps to the in_FOV components
 
                 %% GM component checking step
                 % Check for GM in FOV

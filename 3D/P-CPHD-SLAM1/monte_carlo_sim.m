@@ -57,10 +57,10 @@ filter_params.motion_sigma = [0.1; 0.1; 0.0; 0.03; 0.03; 0.03];
 
 % Map CPHD config
 filter_params.max_card = 200;
-filter_params.cluster_max_card = 50;
+filter_params.cluster_max_card = 100;
 filter_params.survive_prob = 0.99;
 filter_params.birthGM_intensity = 0.05;             % Default intensity of GM component when birth
-filter_params.birthGM_std = 0.5;                  % Default standard deviation in position of GM component when birth
+filter_params.birthGM_std = 2;                  % Default standard deviation in position of GM component when birth
 filter_params.map_std = 0;
 filter_params.adaptive_birth_dist_thres = 1;
 filter_params.GM_inten_thres = 0.0;                % Threshold to use a component for importance weight calc and plotting
