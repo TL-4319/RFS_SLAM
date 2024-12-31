@@ -1,0 +1,358 @@
+function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+    addpath '../../util/'
+    rng(420)
+    time_vec = dataset.time_vec;
+    dt = time_vec(2) - time_vec(1);
+
+    % Construct time vec for sensor - for multi rate between sensor and sim
+    sensor_time_vec_sz = ceil(size(time_vec,2) * (dt/(1/sensor_params.sensor_rate)));
+    sensor_time_vec = 0:sensor_time_vec_sz;
+    sensor_time_vec = sensor_time_vec * (1/sensor_params.sensor_rate);
+
+    delta_t_sensor_and_simend = sensor_time_vec - time_vec(end);
+    ind_t_sensor_pass_sim = find (delta_t_sensor_and_simend > 0);
+    sensor_time_vec = sensor_time_vec(1:ind_t_sensor_pass_sim(1)-1);
+
+    if draw
+        fig1 = figure(1);
+        title ("Sim world")
+        fig1.Position = [1,1,1000,1000];
+
+    end
+
+    %% Prepare truth data struct
+    truth.pos = dataset.pos;
+    truth.quat = dataset.quat;
+    
+    % Prepare some odom estimation
+    odom.pos = truth.pos;
+    odom.quat = truth.quat;
+    odom.body_trans_vel = zeros(3,size(time_vec,2));
+    odom.body_rot_vel = odom.body_trans_vel;
+
+    % Pre run the sim to generate map and meas data. Should help with run 
+    % time as well
+    truth.cummulative_landmark_in_FOV = cell(size(sensor_time_vec,2),1);
+    meas_table = cell(size(sensor_time_vec,2),1);
+    disp('Pre generate odom est, measurements and cummulative landmark map')
+    sensor_time_ind = 1;
+    for kk = 1:size(time_vec,2)
+        if abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5
+            % Sensor pose
+            [sensor_pos, sensor_quat] = ...
+                get_sensor_pose(truth.pos(:,kk), truth.quat(kk,:), sensor_params);
+
+            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_rbe_3D(sensor_pos,...
+                sensor_quat,dataset.landmark_locations, sensor_params);
+            meas_table{sensor_time_ind,:} = cur_meas;
+            if sensor_time_ind == 1
+                truth.cummulative_landmark_in_FOV{sensor_time_ind,1} = landmark_in_FOV;
+            else
+                temp = unique(vertcat(truth.cummulative_landmark_in_FOV{sensor_time_ind-1,1}(:,:)', landmark_in_FOV'),'rows');
+                truth.cummulative_landmark_in_FOV{sensor_time_ind,1} = temp';
+            end
+            if sensor_time_ind < size(sensor_time_vec,2)
+                sensor_time_ind = sensor_time_ind+1;
+            end
+        end
+        % Simulated pure odometry
+        if kk == 1
+            odom.pos(:,kk) = truth.pos(:,kk);
+            odom.quat(kk,:) = truth.quat(kk,:);
+        else
+            % Sample odometry - 3D rot but 2D motion for rover
+            body_trans_vel_sample = zeros(3,1);
+            body_rot_vel_sample = zeros(3,1);
+    
+            body_trans_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(1));
+            body_trans_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(2));
+            body_trans_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(3));
+
+            body_rot_vel_sample(1,1) = normrnd(0,odom_params.motion_sigma(4));
+            body_rot_vel_sample(2,1) = normrnd(0,odom_params.motion_sigma(5));
+            body_rot_vel_sample(3,1) = normrnd(0,odom_params.motion_sigma(6));
+    
+            body_trans_vel = dataset.trans_vel_body(:,kk) + body_trans_vel_sample;
+            body_rot_vel = dataset.rot_vel_body(:,kk) + body_rot_vel_sample;
+
+            odom.body_trans_vel(:,kk) = body_trans_vel;
+            odom.body_rot_vel(:,kk) = body_rot_vel;
+
+            [odom.pos(:,kk), odom.quat(kk,:)] = ...
+                propagate_state (odom.pos(:,kk-1), odom.quat(kk-1,:),...
+                body_trans_vel, body_rot_vel, dt);
+        end
+    end
+    disp('done')
+    clc;
+
+    %% Pre allocate datas for estimation
+
+    est.pos = truth.pos;
+    est.quat = truth.quat;
+    est.map_est = cell(size(time_vec,2),1);
+    est.compute_time = zeros(size(time_vec,2),1);
+    
+    %% Initialize filter
+    if strcmp(sensor_params.meas_model,'cartesian')
+        cur_meas = meas_table{1,1};
+        % Calc sensor pose in world frame
+        [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,1), truth.quat(1,:), sensor_params);
+        meas_world_frame = reproject_meas(sensor_pos,sensor_quat,cur_meas, sensor_params);
+    elseif strcmp(sensor_params.meas_model,'range-bearing-elevation')
+        cur_meas = meas_table{1,1};
+        % Calc sensor pose in world frame
+        [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,1), truth.quat(1,:), sensor_params);
+        meas_world_frame = reproject_meas(sensor_pos,sensor_quat, cur_meas, sensor_params);
+    else
+        error_msg = strcat(sensor_params.meas_model, " measurement model is not supported");
+        error(error_msg);
+    end
+
+    particles = init_cphd1_particles_3D(truth.pos(:,1),...
+        truth.quat(1,:),meas_world_frame,filter_params);
+
+    %% Run simulation
+    sensor_time_ind = 2;
+
+     % obj = VideoWriter("myvideo","Motion JPEG AVI");
+     % obj.Quality = 100;
+     % obj.FrameRate = 5;
+     % open(obj);
+
+    for kk = 2:size(time_vec,2) 
+        %% Get current measurements and reproject for viz if measurement avail
+        meas_avail = abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5;
+        
+        if meas_avail
+            cur_meas = meas_table{sensor_time_ind,1};
+            [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,kk),...
+                    truth.quat(kk),sensor_params);
+            meas_reprojected = reproject_meas(sensor_pos, sensor_quat,...
+                cur_meas, sensor_params);
+
+            if sensor_time_ind < size(sensor_time_vec,2)
+                sensor_time_ind = sensor_time_ind + 1;
+            end
+        end
+
+        out_loop_timer = tic;
+        for par_ind = 1:size(particles,2)
+            cur_par = particles(par_ind);
+
+            %% Particle time update
+            if strcmp(filter_params.motion_model,'odometry')
+                % Sample odometry - constraint to 2D
+                body_trans_vel_sample = zeros(3,1);
+                body_rot_vel_sample = zeros(3,1);
+    
+                body_trans_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(1));
+                body_trans_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(2));
+                body_trans_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(3));
+
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
+                body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
+                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
+
+                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
+                body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
+                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
+
+                % Add noise to odom measurement
+                body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
+                body_rot_vel = odom.body_rot_vel(:,kk) + body_rot_vel_sample;
+                
+                [cur_pos, cur_quat] = ...
+                    propagate_state (particles(1,par_ind).pos, particles(1,par_ind).quat,...
+                    body_trans_vel, body_rot_vel, dt);
+            elseif strcmp(filter_params.motion_model,'truth')
+                cur_pos = truth.pos(:,kk);
+                cur_quat = truth.quat(kk,:);
+                
+            else
+                error_msg = strcat(filter_params.motion_model, " motion model is not supported");
+                error(error_msg);
+            end
+            
+            particles(1,par_ind).pos = cur_pos;
+            particles(1,par_ind).quat = cur_quat;
+            
+            %if false
+            if meas_avail
+                %PF meas update if measurement available
+                % In CPHD filter while it is possible to split the PHD and
+                % card distribution, it is not trivial. This implementation
+                % apply the CPHD over the entire per-particle map PHD,
+                % treating out-of-FOV compoenent as having 0% detect prob.
+
+                % Further research and implementation of CPHD splitting and
+                % merging might lower compute time.
+
+                %% GM component checking step
+                % Check for GM in FOV
+                num_GM_prev = size(particles(1,par_ind).gm_mu,2);
+                gm_mu_temp = particles(1,par_ind).gm_mu;
+                [sensor_pos, sensor_quat] = get_sensor_pose(particles(1,par_ind).pos,...
+                    particles(1,par_ind).quat,sensor_params);
+                [GM_in_FOV,~] = check_in_FOV_3D(gm_mu_temp, ...
+                    sensor_pos, sensor_quat, sensor_params);
+                
+                
+                
+                 % Extract GM components not in FOV. No changes are made to
+                 % them.
+                GM_out_FOV = ~GM_in_FOV;
+                GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
+                GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
+                GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
+                card_dist_out = calc_card_dist (GM_inten_out, filter_params.cluster_max_card);
+        
+                % Extract GM components in FOV. These are used during
+                % update. 
+                
+                GM_mu_in = particles(1,par_ind).gm_mu(:,GM_in_FOV);
+                GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
+                GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
+                num_GM_in = size(GM_inten_in,2);
+                card_dist_in = calc_card_dist(GM_inten_in, filter_params.cluster_max_card);
+
+                % Constant prob_detect within FOV
+                detect_prob_vec = filter_params.sensor.detect_prob * ones(1,num_GM_in);
+                
+    
+                %% Per particle map update
+                % Only do update if there are GM in the FOV
+                if num_GM_in > 0
+                    % CPHD time update with special case of no birth or
+                    % death. Birth will be added afterward using curent
+                    % measurement. 
+
+                    % Essentially, the PHD and card_dist stays the same
+                    % here
+                        
+                    % CPHD meas update for only in FOV GM
+                    [particles(1,par_ind).w, GM_mu_in, GM_cov_in, GM_inten_in, card_dist_in]=...
+                        p_cphd_measurement_update(particles(1,par_ind),...
+                        GM_mu_in, GM_cov_in, GM_inten_in, card_dist_in, detect_prob_vec, ...
+                        cur_meas, filter_params);
+    
+                    %% Clean up GM components
+                    [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
+                    GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
+                    filter_params.merge_dist, filter_params.num_GM_cap);
+    
+                    %% Parse updated GM and cardinality distribution
+                    %% Parse updated GM and include out of FOV components
+                    particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
+                    particles(1,par_ind).gm_inten = cat (2, GM_inten_in, GM_inten_out);
+                    particles(1,par_ind).gm_cov = cat(3,GM_cov_in, GM_cov_out);
+                    particles(1,par_ind).card_dist = merge_card_dist(card_dist_in, ...
+                        card_dist_out, filter_params);
+    
+                else%num_GM_in > 0
+                    particles(1,par_ind).w = 1e-99;
+                end %num_GM_in > 0
+            end
+        end %par_ind = 1:size(particles,2)
+
+        %% State estimation
+        [pose_est, map_est_struct] = extract_estimates_max_likeli(particles, filter_params);
+        est.pos(:,kk) = pose_est.pos;
+        est.quat(kk,:) = pose_est.quat;
+        % Add zero z component for map
+        map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
+        est.map{kk,1} = map_est_struct;
+        
+        % Resample (if needed)
+        [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
+
+        %% CPHD-time update
+        if meas_avail
+            %% Generate birth intensity and cardinality. Based on Lin Gao's
+            % birth determination scheme
+            particles = adaptive_birth_and_time_update_CPHD_3D (cur_meas, ...
+                filter_params, particles);
+            
+        end
+        
+        
+
+        % Timing
+        est.compute_time(kk) = toc(out_loop_timer);
+    
+        if draw && meas_avail
+        %%Ploting
+        [sensor_pos, sensor_quat] = get_sensor_pose(truth.pos(:,kk), truth.quat(kk,:), sensor_params);
+
+        figure(1)
+        % Draw robot and sensor pose
+        draw_trajectory(truth.pos(:,kk), truth.quat(kk,:), truth.pos(:,1:kk),2, 2,'k',false);
+        draw_trajectory(sensor_pos, sensor_quat, truth.pos(:,1:kk),2, 2,'none',true);
+
+        % Draw filter estimates
+        %draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
+
+        %Draw odometry estimates
+        %draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 2, 2, 'r',true);
+
+        hold on
+        set(gca, 'Zdir', 'reverse')
+        set(gca, 'Ydir', 'reverse')
+        grid on
+
+        % Draw true landmark position
+        scatter3(truth.cummulative_landmark_in_FOV{end,1}(1,:),...
+            truth.cummulative_landmark_in_FOV{end,1}(2,:),...
+            truth.cummulative_landmark_in_FOV{end,1}(3,:),...
+            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 50,'k')
+        
+        % Draw measurements reprojected in global frame from true pose
+        scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
+            ones(size(meas_reprojected,2),1) * 50,'b*');
+
+        % Draw map estimate
+        if size(map_est,2) > 0
+        scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
+            ones(size(map_est,2),1) * 20,'r+')
+        end
+        
+        % Draw map est coveriance ellipsoids
+        plot_3D_phd(map_est_struct, 1, 0.00001, 1, 2)
+
+        xlabel("X (m)");
+        ylabel("Y (m)");
+        zlabel("Z (m)");
+        axis equal;
+        xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
+        ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
+        zlim([-5 5])
+        title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
+        
+        colorbar
+        clim([0 1.1])
+        title(title_str)
+        view(0,90)
+        drawnow
+
+        figure(2)
+        plot (0:filter_params.max_card, particles(1,1).card_dist);
+        xlim([0 filter_params.max_card])
+        ylim([0 1])
+        % % savefig(fig1, "test.fig")
+        % %writeVideo(obj,getframe(openfig("test.fig","invisible")));
+        % writeVideo(obj,getframe(gcf));
+        end %draw
+        
+
+    end %kk = 2:size(time_vec,2)
+    
+    % obj.close();
+    % End simulation
+    results.truth = truth;
+    results.filter_est = est;
+    results.odom_est = odom;
+    results.time_vec = time_vec;
+    truth.sensor_time_vec = sensor_time_vec;
+    truth.time_vec = time_vec;
+
+end
