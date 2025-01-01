@@ -23,7 +23,7 @@ function card_dist = calc_card_dist (GM_inten, cluster_max_card)
     
     esfvals = esf(XI_vals);
 
-    for card_val = 1:num_GM
+    for card_val = 1:min(num_GM,cluster_max_card)
         ind_n = card_val + 1;
         card_dist(ind_n) = prod_inv_inten * esfvals(card_val);
     end
