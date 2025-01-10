@@ -18,23 +18,33 @@ draw = false;
 
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 20;
-num_landmark = 500;
-min_dist_betwee_landmark = 0.3;
+num_landmark = 10000;
+min_dist_betwee_landmark = 0.4;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 % Remove points that has xy coordinates too close together
-ii = 1;
-while ii < num_landmark
-    cur_xy = landmark_locations(ii,1:2);
-    
-    dist_to_other = landmark_locations(:,1:2);
-    dist_to_other(ii,:) = [];
-    dist_to_other = dist_to_other - cur_xy;
-    dist_to_other = (dist_to_other(:,1).^2 + dist_to_other(:,2).^2).^0.5;
-    ind_too_close = find(dist_to_other < min_dist_betwee_landmark);
-    landmark_locations(ind_too_close,:) = [];
-    num_landmark = num_landmark - size(ind_too_close,1);
-    ii = ii + 1;
+
+time_cull = 1;
+while time_cull > 0
+    time_cull = 0;
+    ii = 1;
+    while ii < num_landmark
+        cur_xy = landmark_locations(ii,1:2);
+        dist_to_other = landmark_locations(:,1:2);
+        %dist_to_other(ii,:) = [];
+        dist_to_other = dist_to_other - cur_xy;
+        dist_to_other = (dist_to_other(:,1).^2 + dist_to_other(:,2).^2).^0.5;
+        ind_too_close = find(dist_to_other < min_dist_betwee_landmark);
+        if size(ind_too_close,1) > 1
+            time_cull = time_cull + 1;
+            ind_too_close(ind_too_close ==  ii) = [];
+            landmark_locations(ind_too_close,:) = [];
+            num_landmark = num_landmark - size(ind_too_close,1);
+        end
+        ii = ii + 1;
+    end
 end
+
+
 
 landmark_locations(:,3) = (rand(num_landmark,1) - 0.5) * 0.3 ; % This aim to simulate planetary env where features are terrain based on ground
 landmark_locations = landmark_locations';
@@ -88,7 +98,7 @@ dataset.quat_sensor = dataset.quat;
 for ii = 1:size(dataset.pos,2)
     dataset.pos_sensor(:,ii) = dataset.pos(:,ii) +...
         transpose(rotatepoint(dataset.quat(ii),dataset.pos_body_sensor'));
-    dataset.quat_sensor(ii) = quatmultiply(dataset.quat_body_sensor, dataset.quat(ii));
+    dataset.quat_sensor(ii) = quatmultiply(dataset.quat(ii),dataset.quat_body_sensor);
 end
 
 % Extra measurement can be used to simulate IMU
@@ -119,3 +129,20 @@ if draw
         drawnow
     end
 end
+kk = size(time_vec,2);
+figure(1)
+        draw_trajectory(pos(:,kk), quat(kk,:),pos(:,1:kk-1), 2, 2, 'k',false)
+        draw_trajectory(dataset.pos_sensor(:,kk), dataset.quat_sensor(kk), pos(:,1:kk-1), 2, 2,'none',true)
+        set(gca, 'Zdir', 'reverse')
+        set(gca, 'Ydir', 'reverse')
+        grid on
+        view([0,90])
+        hold on
+        scatter3(landmark_locations(1,:),landmark_locations(2,:),landmark_locations(3,:),'k')
+        xlabel("X");
+        ylabel("Y");
+        zlabel("Z");
+        axis equal
+        title_str = sprintf("i = %d", kk);
+        title (title_str)
+        drawnow
