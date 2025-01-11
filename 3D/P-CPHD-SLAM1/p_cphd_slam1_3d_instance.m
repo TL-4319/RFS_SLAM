@@ -197,7 +197,7 @@ function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom
                 GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
                 GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
                 GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
-                card_dist_out = calc_card_dist (GM_inten_out, filter_params.cluster_max_card);
+                card_dist_out = calc_card_dist_MB (GM_inten_out, filter_params.max_card); % Can just use max_card since no update is done on this cluster
         
                 % Extract GM components in FOV. These are used during
                 % update. 
@@ -206,10 +206,10 @@ function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom
                 GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
                 GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
                 num_GM_in = size(GM_inten_in,2);
-                card_dist_in = calc_card_dist(GM_inten_in, filter_params.cluster_max_card);
+                card_dist_in = calc_card_dist_MB(GM_inten_in, filter_params.cluster_max_card);
                 % Spoof card_dist_in for debuggin
-                % card_dist_in = zeros(1, filter_params.cluster_max_card+1);
-                % card_dist_in(num_GM_in+1) = 1;
+                card_dist_in = zeros(1, filter_params.cluster_max_card+1);
+                card_dist_in(num_GM_in+1) = 1;
 
                 % Constant prob_detect within FOV
                 detect_prob_vec = filter_params.sensor.detect_prob * ones(1,num_GM_in);
@@ -258,7 +258,7 @@ function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map{kk,1} = map_est_struct;
+        est.map_est{sensor_time_ind,1} = map_est_struct;
         
         % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
@@ -331,15 +331,15 @@ function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom
         view(0,90)
         drawnow
 
-        figure(5)
-        plot (0:filter_params.cluster_max_card, card_dist_in, 'DisplayName','card dist in');
-        hold on
-        plot (0:filter_params.cluster_max_card, card_dist_out, 'DisplayName','card dist out');
-        plot (0:filter_params.max_card, particles(1,1).card_dist, 'DisplayName','card dist merged');
-        hold off
-        xlim([0 filter_params.max_card])
-        legend
-        ylim([0 1])
+        % figure(5)
+        % plot (0:filter_params.cluster_max_card, card_dist_in, 'DisplayName','card dist in');
+        % hold on
+        % plot (0:filter_params.cluster_max_card, card_dist_out, 'DisplayName','card dist out');
+        % plot (0:filter_params.max_card, particles(1,1).card_dist, 'DisplayName','card dist merged');
+        % hold off
+        % xlim([0 filter_params.max_card])
+        % legend
+        % ylim([0 1])
         % % savefig(fig1, "test.fig")
         % %writeVideo(obj,getframe(openfig("test.fig","invisible")));
         % writeVideo(obj,getframe(gcf));

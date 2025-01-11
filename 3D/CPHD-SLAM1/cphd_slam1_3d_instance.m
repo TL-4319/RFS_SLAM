@@ -1,6 +1,6 @@
 function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
-    %rng(420)
+    rng(420)
     time_vec = dataset.time_vec;
     dt = time_vec(2) - time_vec(1);
 
@@ -154,10 +154,6 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
                 body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
                 body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
 
-                body_rot_vel_sample(1,1) = normrnd(0,filter_params.motion_sigma(4));
-                body_rot_vel_sample(2,1) = normrnd(0,filter_params.motion_sigma(5));
-                body_rot_vel_sample(3,1) = normrnd(0,filter_params.motion_sigma(6));
-
                 % Add noise to odom measurement
                 body_trans_vel = odom.body_trans_vel(:,kk) + body_trans_vel_sample;
                 body_rot_vel = odom.body_rot_vel(:,kk) + body_rot_vel_sample;
@@ -220,6 +216,7 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
                 GM_mu = particles(1,par_ind).gm_mu;
                 GM_inten = particles(1,par_ind).gm_inten;
                 card_dist = particles(1,par_ind).card_dist;
+                %card_dist = calc_card_dist_MB(GM_inten, filter_params.max_card);
     
                 %% Per particle map update
                 % Only do update if there are GM in the FOV
@@ -322,19 +319,25 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
         ylabel("Y (m)");
         zlabel("Z (m)");
         axis equal;
-        xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
-        ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
-        zlim([-5 5])
+        %xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
+        %ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
+        %zlim([-5 5])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
         
         colorbar
-        clim([0 1.3])
+        clim([0 4])
         title(title_str)
         view(0,90)
         drawnow
         % % savefig(fig1, "test.fig")
         % %writeVideo(obj,getframe(openfig("test.fig","invisible")));
         % writeVideo(obj,getframe(gcf));
+
+        % figure(2)
+        % plot (0:filter_params.max_card, particles(1,1).card_dist);
+        % xlim([0 filter_params.max_card])
+        % ylim([0 1])
+        
         end %draw
         
 

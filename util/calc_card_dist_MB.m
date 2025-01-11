@@ -1,9 +1,10 @@
-function card_dist = calc_card_dist (GM_inten, cluster_max_card)
+function card_dist = calc_card_dist_MB (GM_inten, cluster_max_card)
     % Construct the cardinality distribution using method proposed by Yohan
-    % Petetin
+    % Petetin which treat GM components as MB 
+    % 
    
     % Limit range of inten from 0 to approx 1 as defined by Mahler and for numerical eval
-    GM_inten(GM_inten > 0.999) = 0.999;
+    GM_inten(GM_inten > 0.9) = 0.9;
 
     num_GM = size(GM_inten,2);
     

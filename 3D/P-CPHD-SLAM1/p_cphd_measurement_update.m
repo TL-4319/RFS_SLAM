@@ -141,33 +141,33 @@ detect_prob_vec, meas, filter_params)
         GM_cov_update = GM_cov;
         GM_inten_update = GM_inten;% / sum(GM_inten,2);
 
-        figure(4)
-        plot (upsilon0_E,'--')
-        hold on
-        for ii = 1:size(upsilon1_D,2)
-            plot (upsilon1_D(:,ii))
-        end
-        hold off
+        % figure(4)
+        % plot (upsilon0_E,'--')
+        % hold on
+        % for ii = 1:size(upsilon1_D,2)
+        %     plot (upsilon1_D(:,ii))
+        % end
+        % hold off
         % Card update
         card_dist_update = upsilon0_E' .* card_dist_prev;
         card_dist_update = card_dist_update/sum(card_dist_update,2); % Normalize
-
-        figure(2)
-        plot(card_dist_prev)
-        hold on
-        plot (card_dist_update)
-        ylim([0 1])
-        xlim([0 filter_params.cluster_max_card])
-        hold off
-        drawnow
-
-        figure(3)
-        plot (GM_inten_prev)
-        hold on
-        plot (GM_inten_update)
-        hold off
-        %ylim([0 2])
-        drawnow
+        % 
+        % figure(2)
+        % plot(card_dist_prev)
+        % hold on
+        % plot (card_dist_update)
+        % ylim([0 1])
+        % xlim([0 filter_params.cluster_max_card])
+        % hold off
+        % drawnow
+        % 
+        % figure(3)
+        % plot (GM_inten_prev)
+        % hold on
+        % plot (GM_inten_update)
+        % hold off
+        % %ylim([0 2])
+        % drawnow
 
     else
         error_msg = strcat(filter_params.inner_filter, " inner filter is not supported");

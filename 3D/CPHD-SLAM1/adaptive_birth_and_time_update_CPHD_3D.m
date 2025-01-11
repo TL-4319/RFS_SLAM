@@ -32,34 +32,31 @@ for par_ind = 1:size(particle,2)
         new_birth_cov = repmat(filter.birthGM_cov,[1,1,size(measurement,2)]);
     end
 
+    %n_new_birth = size(new_birth_inten,2);
+    n_new_birth = sum(new_birth_inten,2);
 
+    % survival cardinality
+    survive_card_pred = zeros(1,filter.max_card+1);
 
-
-
-    n_new_birth = size(new_birth_inten,2);
-    if n_new_birth > 0
-
-        % survival cardinality
-        survive_card_pred = zeros(1,filter.max_card+1);
-
-        for nn = 0:filter.max_card
-            ind_n = nn + 1;
-            terms = zeros(filter.max_card+1,1);
-            for jj = nn:filter.max_card
-                ind_j = jj + 1;
-                terms(ind_j) = exp(sum(log(1:jj))-sum(log(1:nn))-...
+    for nn = 0:filter.max_card
+        ind_n = nn + 1;
+        terms = zeros(filter.max_card+1,1);
+        for jj = nn:filter.max_card
+            ind_j = jj + 1;
+            terms(ind_j) = exp(sum(log(1:jj))-sum(log(1:nn))-...
                 sum(log(1:jj-nn)) + nn * log(filter.survive_prob)+...
                 (jj-nn)*log(1 - filter.survive_prob)) * particle(1,par_ind).card_dist(ind_j);
-            end
-            survive_card_pred(ind_n) = sum(terms);
         end
+        survive_card_pred(ind_n) = sum(terms);
+    end
 
-        % GM component do not move but inflate uncertainty 
-        for jj = 1:size(cur_GM_mu,2)
-            particle(1,par_ind).gm_cov(:,:,jj) = particle(1,par_ind).gm_cov(:,:,jj) + filter.map_Q;
-        end
-        
-        % Add birth terms 
+    % GM component do not move but inflate uncertainty
+    for jj = 1:size(cur_GM_mu,2)
+        particle(1,par_ind).gm_cov(:,:,jj) = particle(1,par_ind).gm_cov(:,:,jj) + filter.map_Q;
+    end
+
+    if n_new_birth > 0
+        % Add birth terms
         particle(1,par_ind).gm_cov = cat(3,particle(1,par_ind).gm_cov, new_birth_cov);
         particle(1,par_ind).gm_inten = horzcat(particle(1,par_ind).gm_inten, new_birth_inten);
         particle(1,par_ind).gm_mu = horzcat(particle(1,par_ind).gm_mu, new_birth_mu);
@@ -82,6 +79,8 @@ for par_ind = 1:size(particle,2)
 
         card_pred = card_pred/sum(card_pred,2);
         particle(1, par_ind).card_dist = card_pred;
+    else 
+        particle(1, par_ind).card_dist = survive_card_pred / sum(survive_card_pred,2);
     end
 
 end %par_ind = 1:size(particle,2)

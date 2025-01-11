@@ -18,8 +18,8 @@ draw = false;
 
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 20;
-num_landmark = 10000;
-min_dist_betwee_landmark = 0.4;
+num_landmark = 5000;
+min_dist_betwee_landmark = 1.;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 % Remove points that has xy coordinates too close together
 
