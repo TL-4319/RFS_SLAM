@@ -14,7 +14,7 @@ draw = false;
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_datasets/dataset_2d_30Hz.mat');
+load ('../generated_datasets/truth_2D_3.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y]'. 

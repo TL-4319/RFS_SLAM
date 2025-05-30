@@ -25,7 +25,7 @@ sensor_dt = sensor_time_vec(2) - sensor_time_vec(1);
 slam_pos_error = zeros(3,size(simulation.truth.pos,2));
 slam_eul_error = slam_pos_error;
 odom_pos_error = slam_pos_error;
-odom_euler_error = slam_pos_error;
+odom_eul_error = slam_pos_error;
 
 % Preallocate mapping error metrics
 true_card = zeros(1, size(simulation.truth.cummulative_landmark_in_FOV,1));
@@ -46,9 +46,13 @@ cola_1 = zeros(size(simulation.result,1),1);
 cola_2 = cola_1;
 cola_3 = cola_1;
 
+% Compute time
+compute_time = zeros(size(simulation.result,1), size(time_vec,2));
 
 % Iterate through sim results to find avg errors
-for ii = 1:size(simulation.result,1)
+%for ii = 1:size(simulation.result,1)
+for ii = 1:60
+    disp(ii)
     if ii == 1
         slam_pos_error = abs(simulation.truth.pos -...
             simulation.result{ii,1}.filter_est.pos);
@@ -65,7 +69,7 @@ for ii = 1:size(simulation.result,1)
     else
         slam_pos_error = ((slam_pos_error * (ii-1)) + abs(simulation.truth.pos -...
             simulation.result{ii,1}.filter_est.pos))/ii;
-        odom_pos_error = ((slam_pos_error * (ii-1)) + abs(simulation.truth.pos -...
+        odom_pos_error = ((odom_pos_error * (ii-1)) + abs(simulation.truth.pos -...
             simulation.result{ii,1}.odom_est.pos))/ii;
 
         true_eul = transpose(quat2eul(simulation.truth.quat));
@@ -95,8 +99,10 @@ for ii = 1:size(simulation.result,1)
 
     [cola_1(ii), cola_2(ii), cola_3(ii)] = cola_dist (true_map,...
     est_map, cola_c, cola_p);
-
+    
+    compute_time(ii,:) = simulation.result{ii,1}.filter_est.compute_time';
 end
+avg_compute_time = mean(compute_time,1);
 
 % Card statistics
 avg_card = mean(est_card,1);
@@ -111,6 +117,24 @@ avg_ospa_3 = mean(ospa_3,1);
 avg_cola_1 = mean(cola_1,1);
 avg_cola_2 = mean(cola_2,1);
 avg_cola_3 = mean(cola_3,1);
+
+dist_travel = simulation.truth.pos;
+dist_travel(:,2:end) = simulation.truth.pos(:,2:end) - simulation.truth.pos(:,1:end-1);
+dist_travel = vecnorm(dist_travel);
+dist_travel = cumsum(dist_travel);
+
+error.filter_pos_error = slam_pos_error;
+error.filter_eul_error = slam_eul_error;
+error.odom_pos_error = odom_pos_error;
+error.odom_eul_error = odom_eul_error;
+error.avg_card = avg_card;
+error.std_card = std_card;
+error.avg_ospa = vertcat(avg_ospa_1, avg_ospa_2, avg_ospa_3);
+error.avg_cola = vertcat(avg_cola_1, avg_cola_2, avg_cola_3);
+error.time_vec = time_vec;
+error.dist_travel = dist_travel;
+error.compute_time = avg_compute_time;
+
 
 
 % % Calculate distance travelled for relative metric
