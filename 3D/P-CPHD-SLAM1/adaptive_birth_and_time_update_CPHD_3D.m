@@ -49,10 +49,12 @@ for par_ind = 1:size(particle,2)
         end
         survive_card_pred(ind_n) = sum(terms);
     end
+    
 
     % GM component do not move but inflate uncertainty
     for jj = 1:size(cur_GM_mu,2)
-        particle(1,par_ind).gm_cov(:,:,jj) = particle(1,par_ind).gm_cov(:,:,jj) + filter.map_Q;
+        particle(1,par_ind).gm_cov(:,:,jj) = ...
+            particle(1,par_ind).gm_cov(:,:,jj) + filter.map_Q;
     end
 
     if n_new_birth > 0

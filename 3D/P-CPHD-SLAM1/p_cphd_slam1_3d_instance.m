@@ -1,4 +1,4 @@
-function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function [results,truth] = p_cphd_slam1_3d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
     rng(420)
     time_vec = dataset.time_vec;
@@ -90,7 +90,7 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
 
     est.pos = truth.pos;
     est.quat = truth.quat;
-    est.map_est = cell(size(sensor_time_vec,2),1);
+    est.map_est = cell(size(time_vec,2),1);
     est.compute_time = zeros(size(time_vec,2),1);
     
     %% Initialize filter
@@ -176,13 +176,9 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
             %if false
             if meas_avail
                 %PF meas update if measurement available
-                % In CPHD filter while it is possible to split the PHD and
-                % card distribution, it is not trivial. This implementation
-                % apply the CPHD over the entire per-particle map PHD,
-                % treating out-of-FOV compoenent as having 0% detect prob.
-
-                % Further research and implementation of CPHD splitting and
-                % merging might lower compute time.
+                % This implementation partition the map space into in_FOV
+                % and out_FOV component and only apply the CPHD measurement
+                % update steps to the in_FOV components
 
                 %% GM component checking step
                 % Check for GM in FOV
@@ -193,34 +189,35 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
                 [GM_in_FOV,~] = check_in_FOV_3D(gm_mu_temp, ...
                     sensor_pos, sensor_quat, sensor_params);
                 
-                % Construct statistics for map GMs
-                detect_prob_vec = filter_params.sensor.detect_prob * GM_in_FOV;
+                
                 
                  % Extract GM components not in FOV. No changes are made to
-                 % them. This is not used in CPHD
+                 % them.
                 GM_out_FOV = ~GM_in_FOV;
                 GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
                 GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
                 GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
+                card_dist_out = calc_card_dist_MB (GM_inten_out, filter_params.max_card); % Can just use max_card since no update is done on this cluster
         
                 % Extract GM components in FOV. These are used during
-                % update. Not used in CPHD 
-                % Predict 
+                % update. 
+                
                 GM_mu_in = particles(1,par_ind).gm_mu(:,GM_in_FOV);
                 GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
                 GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
+                num_GM_in = size(GM_inten_in,2);
+                card_dist_in = calc_card_dist_MB(GM_inten_in, filter_params.cluster_max_card);
+                % Spoof card_dist_in for debuggin
+                card_dist_in = zeros(1, filter_params.cluster_max_card+1);
+                card_dist_in(num_GM_in+1) = 1;
+
+                % Constant prob_detect within FOV
+                detect_prob_vec = filter_params.sensor.detect_prob * ones(1,num_GM_in);
                 
-                %
-                num_GM = size(particles(1,par_ind).gm_inten,2);
-                GM_cov = particles(1,par_ind).gm_cov; 
-                GM_mu = particles(1,par_ind).gm_mu;
-                GM_inten = particles(1,par_ind).gm_inten;
-                card_dist = particles(1,par_ind).card_dist;
-                %card_dist = calc_card_dist_MB(GM_inten, filter_params.max_card);
     
                 %% Per particle map update
                 % Only do update if there are GM in the FOV
-                if num_GM > 0
+                if num_GM_in > 0
                     % CPHD time update with special case of no birth or
                     % death. Birth will be added afterward using curent
                     % measurement. 
@@ -228,22 +225,26 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
                     % Essentially, the PHD and card_dist stays the same
                     % here
                         
-                    % CPHD meas update
-                    [particles(1,par_ind).w, GM_mu, GM_cov, GM_inten, card_dist]=...
-                        cphd_measurement_update(particles(1,par_ind),...
-                        GM_mu, GM_cov, GM_inten, card_dist, detect_prob_vec, ...
+                    % CPHD meas update for only in FOV GM
+                    
+                    [particles(1,par_ind).w, GM_mu_in, GM_cov_in, GM_inten_in, card_dist_in]=...
+                        p_cphd_measurement_update(particles(1,par_ind),...
+                        GM_mu_in, GM_cov_in, GM_inten_in, card_dist_in, detect_prob_vec, ...
                         cur_meas, filter_params);
+                   
     
                     %% Clean up GM components
-                    [GM_mu, GM_cov, GM_inten] = cleanup_PHD (GM_mu,...
-                    GM_cov, GM_inten, filter_params.pruning_thres, ...
+                    [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
+                    GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
                     filter_params.merge_dist, filter_params.num_GM_cap);
     
                     %% Parse updated GM and cardinality distribution
-                    particles(1,par_ind).gm_mu = GM_mu;
-                    particles(1,par_ind).gm_inten = GM_inten;
-                    particles(1,par_ind).gm_cov = GM_cov;
-                    particles(1,par_ind).card_dist = card_dist;
+                    %% Parse updated GM and include out of FOV components
+                    particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
+                    particles(1,par_ind).gm_inten = cat (2, GM_inten_in, GM_inten_out);
+                    particles(1,par_ind).gm_cov = cat(3,GM_cov_in, GM_cov_out);
+                    particles(1,par_ind).card_dist = merge_card_dist(card_dist_in, ...
+                        card_dist_out, filter_params);
     
                 else%num_GM_in > 0
                     particles(1,par_ind).w = 1e-99;
@@ -309,7 +310,7 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
         % Draw map estimate
         if size(map_est,2) > 0
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
-            ones(size(map_est,2),1) * 50,'r+')
+            ones(size(map_est,2),1) * 20,'r+')
         end
         
         % Draw map est coveriance ellipsoids
@@ -319,25 +320,29 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
         ylabel("Y (m)");
         zlabel("Z (m)");
         axis equal;
-        %xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
-        %ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
-        %zlim([-5 5])
+        xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
+        ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
+        zlim([-5 5])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
         
         colorbar
-        clim([0 4])
+        clim([0 1.1])
         title(title_str)
         view(0,90)
         drawnow
+
+        % figure(5)
+        % plot (0:filter_params.cluster_max_card, card_dist_in, 'DisplayName','card dist in');
+        % hold on
+        % plot (0:filter_params.cluster_max_card, card_dist_out, 'DisplayName','card dist out');
+        % plot (0:filter_params.max_card, particles(1,1).card_dist, 'DisplayName','card dist merged');
+        % hold off
+        % xlim([0 filter_params.max_card])
+        % legend
+        % ylim([0 1])
         % % savefig(fig1, "test.fig")
         % %writeVideo(obj,getframe(openfig("test.fig","invisible")));
         % writeVideo(obj,getframe(gcf));
-
-        % figure(2)
-        % plot (0:filter_params.max_card, particles(1,1).card_dist);
-        % xlim([0 filter_params.max_card])
-        % ylim([0 1])
-        
         end %draw
         
 
@@ -345,9 +350,10 @@ function [results,truth] = cphd_slam1_3d_instance(dataset, sensor_params, odom_p
     
     % obj.close();
     % End simulation
-    results.meas_table = meas_table;
+    results.truth = truth;
     results.filter_est = est;
     results.odom_est = odom;
+    results.time_vec = time_vec;
     truth.sensor_time_vec = sensor_time_vec;
     truth.time_vec = time_vec;
 

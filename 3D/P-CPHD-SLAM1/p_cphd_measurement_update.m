@@ -1,5 +1,5 @@
 function [likelihood, GM_mu_update, GM_cov_update, GM_inten_update, card_dist_update] = ...
-cphd_measurement_update (particle, GM_mu, GM_cov, GM_inten, card_dist_prev, ...
+p_cphd_measurement_update (particle, GM_mu, GM_cov, GM_inten, card_dist_prev, ...
 detect_prob_vec, meas, filter_params)
     
     % Utilize code from Vo's implementation of CPHD
@@ -23,10 +23,8 @@ detect_prob_vec, meas, filter_params)
         % Pre compute for elementary symmetric function
         XI_vals = zeros(num_meas,1); % input to esf
         for zz = 1:num_meas
-            % XI_vals(zz) = (detect_prob_vec .* GM_inten_prev) * meas_likelihood(:,zz) ...
-            %     / filter_params.sensor.clutter_density;
             XI_vals(zz) = (detect_prob_vec .* GM_inten_prev) * meas_likelihood(:,zz) ...
-                * filter_params.sensor.meas_area;
+                / filter_params.sensor.clutter_density;
         end
         
         
@@ -39,17 +37,13 @@ detect_prob_vec, meas, filter_params)
         end
 
         % Pre calc for upsilons
-        upsilon0_E = zeros(filter_params.max_card+1, 1);
+        upsilon0_E = zeros(filter_params.cluster_max_card+1, 1);
         upsilon1_E = upsilon0_E;
-        upsilon1_D = zeros(filter_params.max_card+1, num_meas);
+        upsilon1_D = zeros(filter_params.cluster_max_card+1, num_meas);
 
-        % mis_detect_prob_inner_prod_est = (ones(size(detect_prob_vec)) - detect_prob_vec) *...
-        %     GM_inten_prev' / size(detect_prob_vec,2); % Approx of <1-P_d, inten> by James McCabe
+        mis_detect_prob = 1 - filter_params.sensor.detect_prob;
 
-        mis_detect_prob_inner_prod_est = (ones(size(detect_prob_vec)) - detect_prob_vec) *...
-            GM_inten_prev'; % Approx of <1-P_d, inten> by James McCabe
-
-        for nn = 0:filter_params.max_card
+        for nn = 0:filter_params.cluster_max_card
             ind_n = nn + 1;
 
             term0_E = zeros(min(num_meas, nn)+1, 1); 
@@ -62,15 +56,15 @@ detect_prob_vec, meas, filter_params)
                 %calculate upsilon0_E(idxn)
                 term0_E(ind_j) = exp( -filter_params.sensor.avg_num_clutter + (num_meas - jj) * log(filter_params.sensor.avg_num_clutter)+...
                     sum(log(1:nn)) - sum(log(1:nn-jj)) +...
-                    (nn - jj) * log(mis_detect_prob_inner_prod_est) -...
-                    nn * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
+                    (nn - jj) * log(mis_detect_prob) -...
+                    jj * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
                 
                 %calculate upsilon1_E(idxn)
                 if nn >= jj+1
                     term1_E(ind_j) = exp( -filter_params.sensor.avg_num_clutter + (num_meas - jj) * log(filter_params.sensor.avg_num_clutter)+...
                     sum(log(1:nn)) - sum(log(1:nn-(jj+1))) +...
-                    (nn - (jj+1)) * log(mis_detect_prob_inner_prod_est) -...
-                    (nn) * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
+                    (nn - (jj+1)) * log(mis_detect_prob) -...
+                    (jj + 1) * log(sum(GM_inten_prev))) * esfvals_E(ind_j);
                 end
 
                 
@@ -89,8 +83,8 @@ detect_prob_vec, meas, filter_params)
                     if nn > jj + 1
                         term1_D(ind_j, zz) = exp( -filter_params.sensor.avg_num_clutter + ((num_meas-1) - jj) * log(filter_params.sensor.avg_num_clutter)+...
                     sum(log(1:nn)) - sum(log(1:nn-(jj+1))) +...
-                    (nn - (jj+1)) * log(mis_detect_prob_inner_prod_est) -...
-                    (nn) * log(sum(GM_inten))) * esfvals_D(ind_j,zz);
+                    (nn - (jj+1)) * log(mis_detect_prob) -...
+                    (jj + 1) * log(sum(GM_inten))) * esfvals_D(ind_j,zz);
 
                     end
                 end
@@ -98,14 +92,12 @@ detect_prob_vec, meas, filter_params)
 
             upsilon1_D(ind_n,:) = sum(term1_D,1);
 
-        end %nn = 0:filter_params.max_card
+        end %nn = 0:filter_params.cluster_max_card
 
         %% GM update step
-        % Update GM components as misdetected with state dependent
-        % detect probabilities
-        mis_detect_prob_vec = ones(size(detect_prob_vec)) - detect_prob_vec;
+        % Misdetected term
         GM_inten = (upsilon1_E' * card_dist_prev')/(upsilon0_E' * card_dist_prev') *...
-            mis_detect_prob_vec .* GM_inten_prev;
+            mis_detect_prob * GM_inten_prev;
 
         % Update GM components as detected
         likelipz = zeros(1,size(meas,2));
@@ -122,10 +114,10 @@ detect_prob_vec, meas, filter_params)
                 GM_mu = horzcat(GM_mu, mu);
                 GM_cov = cat(3,GM_cov, P(:,:,jj));
 
-                % nu = (upsilon1_D(:,zz)' * card_dist')/(upsilon0_E' * card_dist') * ...
-                % detect_prob_vec(jj) .* meas_likelihood(jj,zz)/filter_params.sensor.clutter_density .* GM_inten_prev(jj);
                 nu = (upsilon1_D(:,zz)' * card_dist_prev')/(upsilon0_E' * card_dist_prev') * ...
-                detect_prob_vec(jj) .* meas_likelihood(jj,zz) * filter_params.sensor.meas_area .* GM_inten_prev(jj);
+                detect_prob_vec(jj) .* meas_likelihood(jj,zz) / filter_params.sensor.clutter_density .* GM_inten_prev(jj);
+                % nu = (upsilon1_D(:,zz)' * card_dist_prev')/(upsilon0_E' * card_dist_prev') * ...
+                % detect_prob_vec(jj) .* meas_likelihood(jj,zz) * filter_params.sensor.meas_area .* GM_inten_prev(jj);
 
                 GM_inten = horzcat(GM_inten, nu);
             end %jj = 1:num_GM
@@ -147,27 +139,35 @@ detect_prob_vec, meas, filter_params)
         %% Output
         GM_mu_update = GM_mu;
         GM_cov_update = GM_cov;
-        GM_inten_update = GM_inten;
+        GM_inten_update = GM_inten;% / sum(GM_inten,2);
 
+        % figure(4)
+        % plot (upsilon0_E,'--')
+        % hold on
+        % for ii = 1:size(upsilon1_D,2)
+        %     plot (upsilon1_D(:,ii))
+        % end
+        % hold off
         % Card update
         card_dist_update = upsilon0_E' .* card_dist_prev;
         card_dist_update = card_dist_update/sum(card_dist_update,2); % Normalize
-
-        figure(2)
-        plot(card_dist_prev)
-        hold on
-        plot (card_dist_update)
-        ylim([0 1])
-        xlim([0 filter_params.max_card])
-        hold off
-        drawnow
-
-        figure(3)
-        plot (GM_inten_prev)
-        hold on
-        plot (GM_inten_update)
-        hold off
-        drawnow
+        % 
+        % figure(2)
+        % plot(card_dist_prev)
+        % hold on
+        % plot (card_dist_update)
+        % ylim([0 1])
+        % xlim([0 filter_params.cluster_max_card])
+        % hold off
+        % drawnow
+        % 
+        % figure(3)
+        % plot (GM_inten_prev)
+        % hold on
+        % plot (GM_inten_update)
+        % hold off
+        % %ylim([0 2])
+        % drawnow
 
     else
         error_msg = strcat(filter_params.inner_filter, " inner filter is not supported");

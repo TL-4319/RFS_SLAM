@@ -18,8 +18,8 @@ draw = false;
 
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 20;
-num_landmark = 500;
-min_dist_betwee_landmark = 0.3;
+num_landmark = 5000;
+min_dist_betwee_landmark = 1.;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 % Remove points that has xy coordinates too close together
 time_cull = 1;
@@ -42,6 +42,8 @@ while time_cull > 0
         ii = ii + 1;
     end
 end
+
+
 
 landmark_locations(:,3) = (rand(num_landmark,1) - 0.5) * 0.3 ; % This aim to simulate planetary env where features are terrain based on ground
 landmark_locations = landmark_locations';
@@ -95,7 +97,7 @@ dataset.quat_sensor = dataset.quat;
 for ii = 1:size(dataset.pos,2)
     dataset.pos_sensor(:,ii) = dataset.pos(:,ii) +...
         transpose(rotatepoint(dataset.quat(ii),dataset.pos_body_sensor'));
-    dataset.quat_sensor(ii) = quatmultiply(dataset.quat_body_sensor, dataset.quat(ii));
+    dataset.quat_sensor(ii) = quatmultiply(dataset.quat(ii),dataset.quat_body_sensor);
 end
 
 % Extra measurement can be used to simulate IMU

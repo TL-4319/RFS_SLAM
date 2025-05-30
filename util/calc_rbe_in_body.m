@@ -8,6 +8,7 @@ function [range, bearing, elevation] = calc_rbe_in_body (landmark,...
     
     % Calc bearing from sensor
     bearing = atan2(pos_diff_in_body(2,:),pos_diff_in_body(1,:));
+   
     
     % Calc elevation from sensor
     r = (pos_diff_in_body(2,:).^2 + pos_diff_in_body(1,:).^2).^0.5;
