@@ -205,7 +205,7 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map{sensor_time_ind,1} = map_est_struct;
+        est.map_est{sensor_time_ind,1} = map_est_struct;
         
          % Resample (if needed)
         [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);

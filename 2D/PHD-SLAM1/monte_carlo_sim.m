@@ -23,11 +23,11 @@ sensor_params.meas_model = 'cartesian'; %[cartesian, range-bearing]
 sensor_params.HFOV = deg2rad(100);
 sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
-sensor_params.detect_prob = 0.8;
+sensor_params.detect_prob = 0.9;
 sensor_params.sensor_rate = 1;
 sensor_params.measurement_std = [0.1, 0.1]; 
 sensor_params.avg_num_clutter = 1;
-sensor_params.near_edge_PD_mult = 1;
+sensor_params.near_edge_PD_mult = 0.5;
 
 %sensor_params.meas_area = sensor_params.HFOV * 0.5 * ...
 %    (sensor_params.max_range - sensor_params.min_range)^2;
@@ -42,7 +42,7 @@ odom_params.motion_sigma = [0.5; 0.5; 0.001];
 %% Defind filter parameters
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
-filter_params.sensor.detect_prob = 0.8;
+filter_params.sensor.detect_prob = 0.9;
 filter_params.sensor.measurement_std = [0.1, 0.1];
 filter_params.sensor.avg_num_clutter = 1;
 
