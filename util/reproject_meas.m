@@ -6,8 +6,8 @@ function meas_in_world = reproject_meas (sensor_pos, sensor_quat, meas, sensor_p
 
     if strcmp(sensor_params.meas_model,'cartesian')
         % Reproject measurements into world frame
-        meas_rot_to_world = rotatepoint (quat, meas');
-        meas_in_world = pos + meas_rot_to_world';
+        meas_rot_to_world = rotatepoint (sensor_quat, meas');
+        meas_in_world = sensor_pos + meas_rot_to_world';
     elseif strcmp(sensor_params.meas_model,'range-bearing-elevation')
         % RBE to XYZ conversion
         XYZ_meas = zeros(size(meas));

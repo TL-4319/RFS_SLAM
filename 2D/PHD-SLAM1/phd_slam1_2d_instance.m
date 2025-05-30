@@ -1,8 +1,17 @@
-function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, filter_params, draw)
+function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_params, filter_params, draw)
     addpath '../../util/'
     %rng(420)
     time_vec = dataset.time_vec;
     dt = time_vec(2) - time_vec(1);
+    
+    % Construct time vec for sensor - for multi rate between sensor and sim
+    sensor_time_vec_sz = ceil(size(time_vec,2) * (dt/(1/sensor_params.sensor_rate)));
+    sensor_time_vec = 0:sensor_time_vec_sz;
+    sensor_time_vec = sensor_time_vec * (1/sensor_params.sensor_rate);
+
+    delta_t_sensor_and_simend = sensor_time_vec - time_vec(end);
+    ind_t_sensor_pass_sim = find (delta_t_sensor_and_simend > 0);
+    sensor_time_vec = sensor_time_vec(1:ind_t_sensor_pass_sim(1)-1);
 
     if draw
         fig1 = figure(1);
@@ -24,21 +33,27 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
 
     % Pre run the sim to generate map and mease data. Should help with run 
     % time as well
-    truth.cummulative_landmark_in_FOV = cell(size(time_vec,2),1);
-    meas_table = cell(size(time_vec,2),1);
+    truth.cummulative_landmark_in_FOV = cell(size(sensor_time_vec,2),1);
+    meas_table = cell(size(sensor_time_vec,2),1);
     disp('Pre generate odom est, measurements and cummulative landmark map')
-    for kk = 1:size(time_vec,2)
-        [cur_meas, ~,landmark_in_FOV,~] = gen_meas_cartesian_2D(truth.pos(:,kk),...
+    sensor_time_ind = 1;
+    for kk = 1:size(time_vec,2)  
+        if abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5
+            % Sensor pose
+            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_cartesian_2D(truth.pos(:,kk),...
             truth.quat(kk,:),dataset.landmark_locations, sensor_params);
-
-        meas_table{kk,:} = cur_meas;
-        if kk == 1
-            truth.cummulative_landmark_in_FOV{kk,1} = landmark_in_FOV;
-        else
-            temp = unique(vertcat(truth.cummulative_landmark_in_FOV{kk-1,1}(:,:)', landmark_in_FOV'),'rows');
-            truth.cummulative_landmark_in_FOV{kk,1} = temp';
+            meas_table{sensor_time_ind,:} = cur_meas;
+            if sensor_time_ind == 1
+                truth.cummulative_landmark_in_FOV{sensor_time_ind,1} = landmark_in_FOV;
+            else
+                temp = unique(vertcat(truth.cummulative_landmark_in_FOV{sensor_time_ind-1,1}(:,:)', landmark_in_FOV'),'rows');
+                truth.cummulative_landmark_in_FOV{sensor_time_ind,1} = temp';
+            end
+            if sensor_time_ind < size(sensor_time_vec,2)
+                sensor_time_ind = sensor_time_ind+1;
+            end
         end
-        
+
         % Simulated pure odometry
         if kk == 1
             odom.pos(:,kk) = truth.pos(:,kk);
@@ -87,11 +102,20 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         truth.pos(:,1),truth.quat(1,:),meas_world_frame,filter_params.birthGM_cov, filter_params.birthGM_intensity);
 
     %% Run simulation
+    sensor_time_ind = 2;
     for kk = 2:size(time_vec,2) 
-        %% Get current measurements and reproject for viz
-        cur_meas = meas_table{kk,1};
-        meas_reprojected = reproject_meas(truth.pos(:,kk), truth.quat(kk,:),...
-            cur_meas, sensor_params);
+        %% Get current measurements and reproject for viz if measurement avail
+        meas_avail = abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5;
+        if meas_avail
+            cur_meas = meas_table{sensor_time_ind,1};
+            meas_reprojected = reproject_meas(truth.pos(:,kk), truth.quat(kk,:),...
+                cur_meas, sensor_params);
+
+            if sensor_time_ind < size(sensor_time_vec,2)
+                sensor_time_ind = sensor_time_ind + 1;
+            end
+        end
+
 
         out_loop_timer = tic;
         for par_ind = 1:size(particles,2)
@@ -125,52 +149,54 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
             
             particles(1,par_ind).pos = cur_pos;
             particles(1,par_ind).quat = cur_quat;
-
-            %% GM component checking step
-            % Check for GM in FOV
-            num_GM_prev = size(particles(1,par_ind).gm_mu,2);
-            gm_mu_temp = vertcat(particles(1,par_ind).gm_mu,zeros(1,num_GM_prev));
-            [~,GM_in_FOV] = check_in_FOV_2D(gm_mu_temp, ...
-                particles(1,par_ind).pos, particles(1,par_ind).quat, sensor_params);
-
-             % Extract GM components not in FOV. No changes are made to them
-            GM_out_FOV = ~GM_in_FOV;
-            GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
-            GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
-            GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
-    
-            % Extract GM components in FOV. These are used during update
-            % Predict 
-            GM_mu_in = particles(1,par_ind).gm_mu(:,GM_in_FOV);
-            GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
-            GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
             
-            num_GM_in = size(GM_inten_in,2);
-
-            %% Per particle map update
-            % Only do update if there are GM in the FOV
-            if num_GM_in > 0
-                for jj = 1:num_GM_in
-                    GM_cov_in(:,:,jj) = GM_cov_in(:,:,jj) + filter_params.map_Q;
-                end
-
-                [particles(1,par_ind).w, GM_mu_in, GM_cov_in, GM_inten_in]=...
-                    phd_measurement_update(particles(1,par_ind),...
-                    GM_mu_in, GM_cov_in, GM_inten_in, cur_meas, filter_params);
-
-                %% Clean up GM components
-                [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
-                GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
-                filter_params.merge_dist, filter_params.num_GM_cap);
-
-                %% Parse updated GM and include out of FOV components
-                particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
-                particles(1,par_ind).gm_inten = cat (2, GM_inten_in, GM_inten_out);
-                particles(1,par_ind).gm_cov = cat(3,GM_cov_in, GM_cov_out);
-
-            else%num_GM_in > 0
-                particles(1,par_ind).w = 1e-99;
-            end %num_GM_in > 0
+            if meas_avail
+                %% GM component checking step
+                % Check for GM in FOV
+                num_GM_prev = size(particles(1,par_ind).gm_mu,2);
+                gm_mu_temp = vertcat(particles(1,par_ind).gm_mu,zeros(1,num_GM_prev));
+                [~,GM_in_FOV] = check_in_FOV_2D(gm_mu_temp, ...
+                    particles(1,par_ind).pos, particles(1,par_ind).quat, sensor_params);
+    
+                 % Extract GM components not in FOV. No changes are made to them
+                GM_out_FOV = ~GM_in_FOV;
+                GM_mu_out = particles(1,par_ind).gm_mu(:,GM_out_FOV);
+                GM_cov_out = particles(1,par_ind).gm_cov (:,:,GM_out_FOV);
+                GM_inten_out = particles(1,par_ind).gm_inten(GM_out_FOV);
+        
+                % Extract GM components in FOV. These are used during update
+                % Predict 
+                GM_mu_in = particles(1,par_ind).gm_mu(:,GM_in_FOV);
+                GM_cov_in = particles(1,par_ind).gm_cov (:,:,GM_in_FOV);
+                GM_inten_in = particles(1,par_ind).gm_inten(GM_in_FOV);
+                
+                num_GM_in = size(GM_inten_in,2);
+    
+                %% Per particle map update
+                % Only do update if there are GM in the FOV
+                if num_GM_in > 0
+                    for jj = 1:num_GM_in
+                        GM_cov_in(:,:,jj) = GM_cov_in(:,:,jj) + filter_params.map_Q;
+                    end
+    
+                    [particles(1,par_ind).w, GM_mu_in, GM_cov_in, GM_inten_in]=...
+                        phd_measurement_update(particles(1,par_ind),...
+                        GM_mu_in, GM_cov_in, GM_inten_in, cur_meas, filter_params);
+    
+                    %% Clean up GM components
+                    [GM_mu_in, GM_cov_in, GM_inten_in] = cleanup_PHD (GM_mu_in,...
+                    GM_cov_in, GM_inten_in, filter_params.pruning_thres, ...
+                    filter_params.merge_dist, filter_params.num_GM_cap);
+    
+                    %% Parse updated GM and include out of FOV components
+                    particles(1,par_ind).gm_mu = cat(2,GM_mu_in, GM_mu_out);
+                    particles(1,par_ind).gm_inten = cat (2, GM_inten_in, GM_inten_out);
+                    particles(1,par_ind).gm_cov = cat(3,GM_cov_in, GM_cov_out);
+    
+                else%num_GM_in > 0
+                    particles(1,par_ind).w = 1e-99;
+                end %num_GM_in > 0
+            end %if meas_avail
         end %par_ind = 1:size(particles,2)
 
         %% State estimation
@@ -179,17 +205,14 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         est.quat(kk,:) = pose_est.quat;
         % Add zero z component for map
         map_est = vertcat(map_est_struct.feature_pos,zeros(1,size(map_est_struct.feature_pos,2)));
-        est.map{kk,1} = map_est;
+        est.map{sensor_time_ind,1} = map_est_struct;
+        
+         % Resample (if needed)
+        [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
 
         % Adaptive birth PHD (Lin Gao's implementation)
-        particles = adaptive_birth_PHD_2D (pose_est.pos, pose_est.quat, cur_meas, map_est_struct, filter_params, particles);
+        particles = adaptive_birth_PHD_2D (cur_meas, filter_params, particles);
         
-        % Resample (if needed)
-        if mod(kk,20) == 0
-            disp("check resample")
-            [particles, est.num_effective_particle(kk)] = resample_particles(particles, filter_params);
-        end
-
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
     
@@ -246,10 +269,12 @@ function results = phd_slam1_2d_instance(dataset, sensor_params, odom_params, fi
         obj.close();
     end
     % End simulation
-    results.truth = truth;
+    results.meas_table = meas_table;
     results.filter_est = est;
     results.odom_est = odom;
-    results.time_vec = time_vec;
+    
+    truth.sensor_time_vec = sensor_time_vec;
+    truth.time_vec = time_vec;
 
 
 end
