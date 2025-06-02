@@ -10,7 +10,7 @@ phd_measurement_update (particle, GM_mu, GM_cov, GM_inten, meas, filter_params)
         num_GM = size(GM_inten_prev,2);
 
         % Pre compute measurement matrices
-        [pred_z, K, S, P, Sinv] = pre_compute_update_terms_cartesian_2D(particle, ...
+        [pred_z, K, S, P, Sinv] = pre_compute_update_terms_RB(particle, ...
            GM_mu, GM_cov, filter_params.sensor);
         
         % Update GM components as misdetected
@@ -18,20 +18,6 @@ phd_measurement_update (particle, GM_mu, GM_cov, GM_inten, meas, filter_params)
 
         % Update GM components as detected
         meas = meas(1:2,:); % Only get the 2D measurement
-        
-        % [qz_temp, m_temp, P_temp, P_d_vec] = ekf_update_multiple(meas, particle, GM_mu, GM_cov, filter_params.sensor);
-        
-        % likelipz = zeros(1,size(meas,2));
-        % for zz = 1:size(meas,2)
-        %     w_temp  = GM_inten_prev(:) .* ...
-        %         qz_temp (:,zz);
-        %     w_temp = w_temp ./ (filter_params.sensor.clutter_density + sum(w_temp));
-        %     GM_inten = cat(2,GM_inten, w_temp');
-        %     GM_mu = horzcat(GM_mu, m_temp(:,:,zz));
-        %     GM_cov = cat(3,GM_cov, P_temp);
-        %     likelipz(1,zz) = filter_params.sensor.clutter_density + sum(w_temp',2);
-        % end
-
         likelipz = zeros(1,size(meas,2));
         for zz = 1:size(meas,2)
             tau = zeros(1,num_GM);

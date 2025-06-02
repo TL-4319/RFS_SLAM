@@ -1,4 +1,4 @@
-function plot_2D_phd (map_est, sigma_mult, inten_cutoff, transparency)
+function plot_2D_phd (map_est, sigma_mult, inten_cutoff, transparency, z_offset)
     % Plot the 2D PHD as ellipsoids
     % This function append the 2D GM component with appropriate 3D dummy
     % variables and just call the 3D phd plot function
@@ -13,5 +13,5 @@ function plot_2D_phd (map_est, sigma_mult, inten_cutoff, transparency)
     end
     map_est.max_likeli_gm_cov = temp_cov;
     
-    plot_3D_phd(map_est, sigma_mult, inten_cutoff, transparency);
+    plot_3D_phd(map_est, sigma_mult, inten_cutoff, transparency, z_offset);
 end

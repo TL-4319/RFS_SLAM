@@ -5,29 +5,29 @@ clear;
 clc;
 
 % Define number of MC runs
-num_run = 100;
+num_run = 1;
 
 % Visualization
-draw = false;
+draw = true;
 
 % add path to util functions. 
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_dataset/truth_2D_1.mat');
+load ('../generated_dataset/truth_2D_2.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y]'. 
 % For range_bearing, meas_vector = [az, range]', 
-sensor_params.meas_model = 'cartesian'; %[cartesian, range-bearing]
-sensor_params.HFOV = deg2rad(100);
+sensor_params.meas_model = 'range-bearing'; %[cartesian, range-bearing]
+sensor_params.HFOV = deg2rad(70);
 sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
-sensor_params.detect_prob = 0.9;
+sensor_params.detect_prob = 0.95;
 sensor_params.sensor_rate = 1;
-sensor_params.measurement_std = [0.1, 0.1]; 
-sensor_params.avg_num_clutter = 1;
-sensor_params.near_edge_PD_mult = 0.5;
+sensor_params.measurement_std = [0.3, 0.001]; 
+sensor_params.avg_num_clutter = 5;
+sensor_params.near_edge_PD_mult = 0;
 
 %sensor_params.meas_area = sensor_params.HFOV * 0.5 * ...
 %    (sensor_params.max_range - sensor_params.min_range)^2;
@@ -42,9 +42,9 @@ odom_params.motion_sigma = [0.5; 0.5; 0.001];
 %% Defind filter parameters
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
-filter_params.sensor.detect_prob = 0.9;
-filter_params.sensor.measurement_std = [0.1, 0.1];
-filter_params.sensor.avg_num_clutter = 1;
+filter_params.sensor.detect_prob = 0.95;
+filter_params.sensor.measurement_std = [0.5, 0.001];
+filter_params.sensor.avg_num_clutter = 5;
 
 
 % Particle filter params
@@ -59,11 +59,11 @@ filter_params.motion_sigma = [0.5; 0.5; 0.001];
 
 % Map PHD config
 filter_params.birthGM_intensity = 0.05;             % Default intensity of GM component when birth
-filter_params.birthGM_std = 0.5;                  % Default standard deviation in position of GM component when birth
-filter_params.map_std = 0.0;
-filter_params.adaptive_birth_dist_thres = 1;
-filter_params.GM_inten_thres = 0.1;                % Threshold to use a component for importance weight calc and plotting
-filter_params.pruning_thres = 10^-5;
+filter_params.birthGM_std = 0.1;                  % Default standard deviation in position of GM component when birth
+filter_params.map_std = 0.00;
+filter_params.adaptive_birth_dist_thres = 0.3;
+filter_params.GM_inten_thres = 0.45;                % Threshold to use a component for importance weight calc and plotting
+filter_params.pruning_thres = 10^-2;
 filter_params.merge_dist = 4;
 filter_params.num_GM_cap = 7000;
 filter_params.inner_filter = 'ekf';

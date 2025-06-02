@@ -40,7 +40,7 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
     for kk = 1:size(time_vec,2)  
         if abs(time_vec(kk) - sensor_time_vec(sensor_time_ind)) < 1e-5
             % Sensor pose
-            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_cartesian_2D(truth.pos(:,kk),...
+            [cur_meas, ~,landmark_in_FOV,~] = gen_meas_rb_2D(truth.pos(:,kk),...
             truth.quat(kk,:),dataset.landmark_locations, sensor_params);
             meas_table{sensor_time_ind,:} = cur_meas;
             if sensor_time_ind == 1
@@ -93,13 +93,17 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
         cur_meas = meas_table{1,1};
 
         meas_world_frame = reproject_meas(truth.pos(:,1),truth.quat(1,:),cur_meas, sensor_params);
+
+    elseif strcmp(sensor_params.meas_model,'range-bearing')
+        cur_meas = meas_table{1,1};
+        meas_world_frame = reproject_meas(truth.pos(:,1),truth.quat(1,:),cur_meas, sensor_params);
     else
         error_msg = strcat(sensor_params.meas_model, " measurement model is not supported");
         error(error_msg);
     end
 
-    particles = init_phd1_particles_2D(filter_params.num_particle, ...
-        truth.pos(:,1),truth.quat(1,:),meas_world_frame,filter_params.birthGM_cov, filter_params.birthGM_intensity);
+    particles = init_phd1_particles_2D(truth.pos(:,1),...
+        truth.quat(1,:),meas_world_frame,filter_params);
 
     %% Run simulation
     sensor_time_ind = 2;
@@ -155,7 +159,7 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
                 % Check for GM in FOV
                 num_GM_prev = size(particles(1,par_ind).gm_mu,2);
                 gm_mu_temp = vertcat(particles(1,par_ind).gm_mu,zeros(1,num_GM_prev));
-                [~,GM_in_FOV] = check_in_FOV_2D(gm_mu_temp, ...
+                [GM_in_FOV,~] = check_in_FOV_2D(gm_mu_temp, ...
                     particles(1,par_ind).pos, particles(1,par_ind).quat, sensor_params);
     
                  % Extract GM components not in FOV. No changes are made to them
@@ -216,28 +220,24 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
         % Timing
         est.compute_time(kk) = toc(out_loop_timer);
     
-        if draw
+        if draw && meas_avail
         %%Ploting
         figure(1)
         draw_trajectory(truth.pos(:,kk), truth.quat(kk,:), truth.pos(:,1:kk),4, 2,'k',false);
         draw_trajectory(est.pos(:,kk), est.quat(kk,:), est.pos(:,1:kk), 4, 2, 'g',true);
-        draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 4, 2, 'r',true);
+        % draw_trajectory(odom.pos(:,kk), odom.quat(kk,:), odom.pos(:,1:kk), 4, 2, 'r',true);
         hold on
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
-        scatter3(truth.cummulative_landmark_in_FOV{kk,1}(1,:),...
-            truth.cummulative_landmark_in_FOV{kk,1}(2,:),...
-            truth.cummulative_landmark_in_FOV{kk,1}(3,:),...
-            ones(size(truth.cummulative_landmark_in_FOV{kk,1},2),1) * 50,'k')
-        landmark_not_in_fov = setdiff(truth.cummulative_landmark_in_FOV{end,1}(:,:)',...
-            truth.cummulative_landmark_in_FOV{kk,1}(:,:)',"rows");
-        scatter3(landmark_not_in_fov(:,1),...
-            landmark_not_in_fov(:,2),...
-            landmark_not_in_fov(:,3),...
-            ones(size(landmark_not_in_fov(:,1),1),1) * 10,'k')
-        scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
-            ones(size(meas_reprojected,2),1) * 50,'b*');
+        scatter3(truth.cummulative_landmark_in_FOV{end,1}(1,:),...
+            truth.cummulative_landmark_in_FOV{end,1}(2,:),...
+            truth.cummulative_landmark_in_FOV{end,1}(3,:),...
+            ones(size(truth.cummulative_landmark_in_FOV{end,1},2),1) * 50,'k')
+        if size(meas_reprojected,2) > 0
+            scatter3(meas_reprojected(1,:), meas_reprojected(2,:), meas_reprojected(3,:),...
+                ones(size(meas_reprojected,2),1) * 50,'b*');
+        end
         scatter3(map_est(1,:), map_est(2,:), map_est(3,:),...
             ones(size(map_est,2),1) * 50,'r+')
         xlabel("X (m)");
@@ -247,7 +247,7 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
         xlim([min(truth.cummulative_landmark_in_FOV{end,1}(1,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(1,:) + 10)])
         ylim([min(truth.cummulative_landmark_in_FOV{end,1}(2,:) - 10), max(truth.cummulative_landmark_in_FOV{end,1}(2,:) + 10)])
         title_str = sprintf("Index = %d. t = %f", kk,time_vec(kk));
-        plot_2D_phd(map_est_struct,500,0,1)
+        plot_2D_phd(map_est_struct,100,0.0,1,1)
         colorbar
         title(title_str)
         view(0,90)
@@ -258,16 +258,16 @@ function [results,truth] = phd_slam1_2d_instance(dataset, sensor_params, odom_pa
 
     end %kk = 2:size(time_vec,2)
     
-    if draw
-        % Write video
-        obj = VideoWriter("myvideo");
-        obj.FrameRate = 20;
-        open(obj);
-        for i=1:length(frame)
-            writeVideo(obj,frame{i})
-        end
-        obj.close();
-    end
+    % if draw
+    %     % Write video
+    %     obj = VideoWriter("myvideo");
+    %     obj.FrameRate = 20;
+    %     open(obj);
+    %     for i=1:length(frame)
+    %         writeVideo(obj,frame{i})
+    %     end
+    %     obj.close();
+    % end
     % End simulation
     results.meas_table = meas_table;
     results.filter_est = est;
