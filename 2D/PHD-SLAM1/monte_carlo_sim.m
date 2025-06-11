@@ -14,8 +14,8 @@ draw = false;
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_dataset/truth_2D_seed69_min200cm.mat');
-file_name = strcat('../sim_result/','mapping_seed69_min200cm.mat');
+load ('../generated_dataset/truth_2D_seed69_min500cm.mat');
+file_name = strcat('../sim_result/','slam_seed69_min500cm_500part.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y]'. 
@@ -49,13 +49,13 @@ filter_params.sensor.avg_num_clutter = 5;
 
 
 % Particle filter params
-filter_params.num_particle = 1;
+filter_params.num_particle = 500;
 filter_params.resample_threshold = 0.4; % Percentage of num_particle for resample to trigger
 filter_params.likelihood_method = 'single-cluster'; %['empty', 'single-feature, 'single-cluster']
 
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % For 2D, cov_z, cov_phi and cov_theta = 0
-filter_params.motion_model = 'truth'; % [odometry, random-walk, truth]
+filter_params.motion_model = 'odometry'; % [odometry, random-walk, truth]
 filter_params.motion_sigma = [0.5; 0.5; 0.001];
 
 % Map PHD config

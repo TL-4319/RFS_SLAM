@@ -6,9 +6,10 @@ cola_c = 0.5;
 cola_p = 2;
 
 %% Define eval run
-file_name = ["mapping_seed69_min20cm", "mapping_seed69_min50cm", "mapping_seed69_min100cm" ];
+file_name = ["mapping_seed69_min20cm", "mapping_seed69_min50cm", "mapping_seed69_min100cm",...
+    "mapping_seed69_min200cm", "mapping_seed69_min300cm", "mapping_seed69_min500cm"];
 
-disp_name = ["0.2m","0.5m", "1.0m"];
+disp_name = ["0.2m","0.5m", "1.0m","2.0m", "3.0m","5.0m"];
 
 %%
 % Each cell is a eval run 
@@ -76,6 +77,12 @@ for ii = 1:size(file_name,2)
     end
 end %for ii = 1:size(file_name,2)
 legend
+
+%% Visualize of map
+fig = figure(2);
+title ("Sim world")
+fig.Position = [1,1,1000,1000];
+
 
 %% Util functions
 function Xc= get_comps(X,c)
