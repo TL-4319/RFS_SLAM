@@ -3,7 +3,7 @@ clear;
 clc;
 
 % Define number of MC runs
-num_run = 100;
+num_run = 1;
 
 % Visualization
 draw = true;
@@ -12,7 +12,7 @@ draw = true;
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_datasets/rover_3D_8Hz.mat');
+load ('../generated_datasets/rover_3D_8Hz_spaced.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y, z]'. 
@@ -22,10 +22,10 @@ sensor_params.HFOV = deg2rad(70);
 sensor_params.VFOV = deg2rad(30);
 sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
-sensor_params.detect_prob = 0.99;
+sensor_params.detect_prob = 0.9;
 sensor_params.sensor_rate = 0.8;
-sensor_params.measurement_std = [0.01, 0.001, 0.001];  
-sensor_params.avg_num_clutter = 0;
+sensor_params.measurement_std = [0.1, 0.001, 0.001];  
+sensor_params.avg_num_clutter = 5;
 sensor_params.pos_body_sensor = dataset.pos_body_sensor;
 sensor_params.quat_body_sensor = dataset.quat_body_sensor;
 
@@ -41,23 +41,23 @@ odom_params.motion_sigma =  [0.2; 0.2; 0; 0.001; 0.001; 0.1];
 %% Defind filter parameters
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
-filter_params.sensor.detect_prob = 0.99;
-filter_params.sensor.measurement_std = [0.01, 0.001, 0.001];
-filter_params.sensor.avg_num_clutter = 1;
+filter_params.sensor.detect_prob = 0.9;
+filter_params.sensor.measurement_std = [0.1, 0.001, 0.001];
+filter_params.sensor.avg_num_clutter = 5;
 
 % Particle filter params
-filter_params.num_particle = 100;
+filter_params.num_particle = 1;
 filter_params.resample_threshold = 0.1; % Percentage of num_particle for resample to trigger
 filter_params.likelihood_method = 'single-cluster'; %['empty', 'single-feature, 'single-cluster']
 
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % For 2D, cov_z, cov_phi and cov_theta = 0
-filter_params.motion_model = 'odometry'; % [odometry, random-walk, truth]
+filter_params.motion_model = 'truth'; % [odometry, random-walk, truth]
 filter_params.motion_sigma =  [0.2; 0.2; 0; 0.001; 0.001; 0.1];
 
 % Map CPHD config
 filter_params.max_card = 200;
-filter_params.survive_prob = 0.99;
+filter_params.survive_prob = 0.9999;
 filter_params.birthGM_intensity = 0.9;             % Default intensity of GM component when birth
 filter_params.birthGM_std = 0.5;                  % Default standard deviation in position of GM component when birth
 filter_params.map_std = 0;

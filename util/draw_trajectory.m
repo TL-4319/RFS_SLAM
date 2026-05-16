@@ -33,7 +33,7 @@ function draw_trajectory (pos, quat, traj_hist, axis_lenght, linewidth,traj_colo
     plot3 (unit_y(1,:), unit_y(2,:),unit_y(3,:), 'g','LineWidth',linewidth,'HandleVisibility','off')
     plot3 (unit_z(1,:), unit_z(2,:),unit_z(3,:), 'b', 'LineWidth',linewidth,'HandleVisibility','off')
     if ~strcmp(traj_color,'none')
-        plot3 (traj_hist(1,:), traj_hist (2,:), traj_hist(3,:), traj_color,'HandleVisibility','off')
+        plot3 (traj_hist(1,:), traj_hist (2,:), traj_hist(3,:), traj_color,'HandleVisibility','off',LineWidth=2)
     end
     hold off
 end

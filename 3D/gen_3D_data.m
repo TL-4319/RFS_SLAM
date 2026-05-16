@@ -19,7 +19,7 @@ draw = false;
 %% Generate landmark map - MAP ARE RANDOM
 map_size = 20;
 num_landmark = 5000;
-min_dist_betwee_landmark = 1.;
+min_dist_betwee_landmark = 0.4;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
 % Remove points that has xy coordinates too close together
 time_cull = 1;
@@ -130,18 +130,17 @@ if draw
 end
 kk = size(time_vec,2);
 figure(1)
-        draw_trajectory(pos(:,kk), quat(kk,:),pos(:,1:kk-1), 2, 2, 'k',false)
-        draw_trajectory(dataset.pos_sensor(:,kk), dataset.quat_sensor(kk), pos(:,1:kk-1), 2, 2,'none',true)
+        draw_trajectory_hist(pos, quat, 1.5, 3, 'k',false, 100)
+        draw_trajectory_hist(dataset.pos_sensor, dataset.quat_sensor, 0.7, 3,'none',true,100)
         set(gca, 'Zdir', 'reverse')
         set(gca, 'Ydir', 'reverse')
         grid on
-        view([0,90])
+        view([-35,20])
         hold on
         scatter3(landmark_locations(1,:),landmark_locations(2,:),landmark_locations(3,:),'k')
-        xlabel("X");
-        ylabel("Y");
-        zlabel("Z");
+        xlabel("X (m)");
+        ylabel("Y (m)");
+        zlabel("Z (m)");
         axis equal
-        title_str = sprintf("i = %d", kk);
-        title (title_str)
+        modify_figure(15)
         drawnow
