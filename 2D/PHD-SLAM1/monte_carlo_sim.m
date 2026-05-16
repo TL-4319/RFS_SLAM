@@ -5,16 +5,17 @@ clear;
 clc;
 
 % Define number of MC runs
-num_run = 1;
+num_run = 50;
 
 % Visualization
-draw = true;
+draw = false;
 
 % add path to util functions. 
 addpath('../../util/')
 
 % Select dataset
-load ('../generated_dataset/truth_2D_2.mat');
+load ('../generated_dataset/truth_2D_seed69_min500cm.mat');
+file_name = strcat('../sim_result/','slam_seed69_min500cm_500part.mat');
 
 %% Define sensor parameters to be used to generate measurements
 % For cartesian model, meas_vector = [x, y]'. 
@@ -25,7 +26,7 @@ sensor_params.max_range = 15;
 sensor_params.min_range = 0.4;
 sensor_params.detect_prob = 0.95;
 sensor_params.sensor_rate = 1;
-sensor_params.measurement_std = [0.3, 0.001]; 
+sensor_params.measurement_std = [0.3, 0.008]; 
 sensor_params.avg_num_clutter = 5;
 sensor_params.near_edge_PD_mult = 0;
 
@@ -43,25 +44,25 @@ odom_params.motion_sigma = [0.5; 0.5; 0.001];
 % Sensor params exposed to filter
 filter_params.sensor = sensor_params; % Copy sensor parameter set so filter has different parameters for robust analysis
 filter_params.sensor.detect_prob = 0.95;
-filter_params.sensor.measurement_std = [0.5, 0.001];
+filter_params.sensor.measurement_std = [0.3, 0.008];
 filter_params.sensor.avg_num_clutter = 5;
 
 
 % Particle filter params
-filter_params.num_particle = 1;
+filter_params.num_particle = 500;
 filter_params.resample_threshold = 0.4; % Percentage of num_particle for resample to trigger
 filter_params.likelihood_method = 'single-cluster'; %['empty', 'single-feature, 'single-cluster']
 
 % Motion covariance = [cov_x, cov_y, cov_z, cov_phi, cov_theta, cov_psi]
 % For 2D, cov_z, cov_phi and cov_theta = 0
-filter_params.motion_model = 'truth'; % [odometry, random-walk, truth]
+filter_params.motion_model = 'odometry'; % [odometry, random-walk, truth]
 filter_params.motion_sigma = [0.5; 0.5; 0.001];
 
 % Map PHD config
-filter_params.birthGM_intensity = 0.05;             % Default intensity of GM component when birth
+filter_params.birthGM_intensity = 0.25;             % Default intensity of GM component when birth
 filter_params.birthGM_std = 0.1;                  % Default standard deviation in position of GM component when birth
 filter_params.map_std = 0.00;
-filter_params.adaptive_birth_dist_thres = 0.3;
+filter_params.adaptive_birth_dist_thres = 0.2;
 filter_params.GM_inten_thres = 0.45;                % Threshold to use a component for importance weight calc and plotting
 filter_params.pruning_thres = 10^-2;
 filter_params.merge_dist = 4;
@@ -83,7 +84,7 @@ simulation.filter_params = filter_params;
 simulation.odom_params = odom_params;
 
 results = cell(num_run,1);
-file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
+%file_name = strcat('../sim_result/',sprintf('sim-%s.mat', datestr(now,'yyyymmdd-HHMM')));
 
 for ii = 1:num_run
     disp(ii)

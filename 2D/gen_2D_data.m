@@ -11,7 +11,7 @@ clc
 addpath("../util/")
 
 % Seed the RNG
-rng(100);
+rng(69);
 
 % Enable or disable visualization
 draw = false;
@@ -20,7 +20,7 @@ draw = false;
 map_size = 50;
 num_landmark = 700;
 landmark_locations = (rand(num_landmark, 3) - 0.2) * 2 * map_size;
-min_dist_betwee_landmark = 0.2;
+min_dist_betwee_landmark = 3;
 % Remove points that has xy coordinates too close together
 time_cull = 1;
 while time_cull > 0
